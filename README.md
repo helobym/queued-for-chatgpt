@@ -2,7 +2,7 @@
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**Source version: v1.2.3** — [download the current repository ZIP](https://github.com/helobym/queued-for-chatgpt/archive/refs/heads/main.zip) for the new Recent Activity feature. The [v1.2.2 release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2) remains the most recent prepackaged installation ZIP until a v1.2.3 release is published.
+**[⬇ Download v1.2.3](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.3)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
 
 **New in v1.2.3:** The floating panel shows **Current** (a prompt being prepared, sent, or awaited) and **Previous** (the last confirmed completed prompt) without scrolling through ChatGPT. Saved workflow steps retain their workflow name, ID and step position. Only one short completed-prompt preview is retained per conversation in local browser storage.
 
@@ -14,13 +14,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. To install v1.2.3, use **Code → Download ZIP** on the repository page (or the [main branch ZIP](https://github.com/helobym/queued-for-chatgpt/archive/refs/heads/main.zip)). The older [v1.2.2 release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2) is still available as a prepackaged archive.
+1. Open the [v1.2.3 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.3), expand **Assets**, and download **`queued-for-chatgpt-v1.2.3.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list (**1.2.3** when using the current source).
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.3**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -29,15 +29,15 @@ Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Ins
 
 ## Screenshots
 
-The Queue PNG is a simulated ChatGPT UI capture from v1.2.1 and predates the v1.2.3 Recent Activity strip. The Workflows SVG is an **illustrative v1.2.2 panel mockup**, showing the new Load action. Neither image contains a real conversation.
+Both screenshots below are **illustrative v1.2.3 interface mockups** showing the compact Recent Activity strip shared by Queue and Workflows. They are not live ChatGPT captures and contain no real conversation data. Older screenshots remain in `screenshots/` for reference.
 
 ### Queue
 
-![Queued for ChatGPT — Queue panel with pending prompts](screenshots/queue.png)
+![Queued for ChatGPT v1.2.3 — Queue panel with Current and Previous activity](screenshots/queue-v1.2.3.svg)
 
 ### Saved Queue Workflows
 
-![Queued for ChatGPT — Saved Workflows with Start Workflow and Load buttons](screenshots/workflows-v1.2.2.svg)
+![Queued for ChatGPT v1.2.3 — Workflows with Recent Activity and Start/Load buttons](screenshots/workflows-v1.2.3.svg)
 
 ## What changed in v1.2.3
 
@@ -72,7 +72,7 @@ The Queue PNG is a simulated ChatGPT UI capture from v1.2.1 and predates the v1.
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download the current v1.2.3 source with **Code → Download ZIP** from the repository (the v1.2.2 release ZIP does not contain Recent Activity) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.3.zip`** from the [v1.2.3 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.3) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs to load the new content script.
@@ -121,7 +121,7 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 
 ## Automated tests
 
-`node --test tests/*.test.js` — automated unit/coordinator/background test suite (includes active-queue Load coverage).
+`node --test tests/*.test.js` — automated unit/coordinator/background test suite (includes workflow metadata, recent completion snapshots, and active-queue Load coverage). The GitHub Release workflow runs these tests before publishing the installation archive.
 
 Playwright (installed Chromium, simulated page):
 

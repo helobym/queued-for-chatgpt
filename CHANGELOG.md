@@ -7,6 +7,7 @@
 - Persisted one bounded last-completed prompt preview per conversation in the existing atomic queue record.
 - Preserved conservative completion confirmation, manual recovery, storage idempotency and multi-tab synchronization.
 - Updated local storage privacy disclosure, upgrade guidance and regression coverage.
+- Added the v1.2.3 release-packaging workflow, ZIP/SHA-256 assets and refreshed illustrative UI screenshots.
 
 ## 1.2.2 (2026-11-01)
 
