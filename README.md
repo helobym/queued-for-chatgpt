@@ -69,6 +69,10 @@ Playwright (installed Chromium, simulated page):
 
 No live-site or Chromebook memory test was possible here. Begin with two harmless prompts in a new chat while watching the first run.
 
+## Privacy policy
+
+Queued for ChatGPT saves queues and workflows locally in your browser and submits prompts to ChatGPT when you start a queue or workflow. See our [Privacy Policy](PRIVACY.md) for details about storage, data sharing, and removal.
+
 ## License and ownership
 
 Copyright (c) 2026 **Helobym Networking (Malaysia)**. This project is open source under the **[MIT License](LICENSE)**. You may use, modify, and redistribute the code, including commercially, provided the copyright and license notices remain intact.
