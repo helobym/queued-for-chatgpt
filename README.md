@@ -71,4 +71,6 @@ No live-site or Chromebook memory test was possible here. Begin with two harmles
 
 ## License and ownership
 
-Copyright (c) 2026 **Helobym Networking (Malaysia)**. **All rights reserved.** See [LICENSE](LICENSE) for proprietary copyright and permission terms. This is **not an open-source license**; copying, modification, and redistribution require authorization. Independently developed; no Superpower for ChatGPT code or assets were reused. The project is unofficial and not affiliated with or endorsed by OpenAI or Superpower. Before public distribution, confirm the correct registered legal rightsholder and any needed author/contributor rights assignments.
+Copyright (c) 2026 **Helobym Networking (Malaysia)**. This project is open source under the **[MIT License](LICENSE)**. You may use, modify, and redistribute the code, including commercially, provided the copyright and license notices remain intact.
+
+The project is independently developed; no Superpower for ChatGPT code or assets were reused. It is unofficial and not affiliated with or endorsed by OpenAI or Superpower. Third-party trademarks are not licensed by MIT. Confirm the correct registered legal copyright holder and any necessary contributor rights assignments before publication.

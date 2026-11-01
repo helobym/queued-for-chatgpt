@@ -5,8 +5,10 @@ No Superpower for ChatGPT extension code or assets were copied.
 No Superpower account, license or subscription is needed.
 
 This software is unofficial and is not endorsed by OpenAI or Superpower.
-Copyright (c) 2026 Helobym Networking (Malaysia). All rights reserved.
-This project is proprietary. See LICENSE for permission and distribution terms.
+Copyright (c) 2026 Helobym Networking (Malaysia).
+Licensed under the MIT License. See LICENSE in the repository.
+Please preserve the copyright and license notices in copies or substantial
+portions of the software. Trademarks remain with their respective owners.
 Confirm the legal rightsholder and any required rights assignments before public release.
 
 The extension interacts with the ChatGPT webpage, which may change.

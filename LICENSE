@@ -1,55 +1,21 @@
-QUEUED FOR CHATGPT
-PROPRIETARY SOFTWARE — ALL RIGHTS RESERVED
+MIT License
 
-Copyright (c) 2026 Helobym Networking (Malaysia).
-All rights reserved.
+Copyright (c) 2026 Helobym Networking (Malaysia)
 
-1. Scope
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-This notice applies to the original source code, user-interface code, icons,
-documentation, and other original project materials distributed as part of
-"Queued for ChatGPT", to the extent that Helobym Networking owns the relevant
-rights. Third-party materials, if any, remain subject to their own licenses
-and intellectual-property rights.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-2. Rights reserved
-
-Except to the extent permitted by applicable law, GitHub's applicable terms,
-or a separate written authorization from the relevant copyright holder, no
-permission is granted to reproduce, modify, create derivative works from,
-redistribute, publish, sublicense, sell, or commercially exploit this software.
-
-Access to a copy of the source code, including through a GitHub repository,
-does not itself grant an open-source or redistribution license.
-
-3. Authorized use
-
-Helobym Networking may permit specific users, staff, or organizations to
-install or use the software under separately communicated written terms.
-Such permission does not transfer ownership or grant the right to redistribute
-or sublicense the software unless expressly stated.
-
-4. No warranty
-
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED
-"AS IS", WITHOUT ANY EXPRESS OR IMPLIED WARRANTY, INCLUDING WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
-TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COPYRIGHT HOLDER IS NOT LIABLE
-FOR CLAIMS, DAMAGES, OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
-
-5. Third-party trademarks and independence
-
-"ChatGPT" is a trademark of its respective owner. This project is independent
-and is not affiliated with, sponsored by, or endorsed by OpenAI or Superpower
-for ChatGPT. Nothing in this notice grants rights to third-party trademarks,
-services, software, or other intellectual property.
-
-6. Permission requests
-
-For written permissions or distribution arrangements, contact the repository
-owner for helobym/queued-for-chatgpt.
-
-Note: This is a proprietary copyright and permission notice, not an
-open-source license. Any formal commercial end-user terms, and confirmation
-of the correct legal copyright holder, should be reviewed before public
-distribution.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
