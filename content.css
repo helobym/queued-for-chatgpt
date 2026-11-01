@@ -1,0 +1,61 @@
+/* All rules are scoped. ChatGPT's existing layout remains untouched. */
+#qfc-root { position: fixed; right: 18px; bottom: 88px; z-index: 2147482000; color: #202523; font: 13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif; box-sizing: border-box; }
+#qfc-root *, #qfc-root *::before, #qfc-root *::after { box-sizing: border-box; }
+#qfc-root [hidden] { display: none !important; }
+#qfc-root button, #qfc-root input, #qfc-root textarea { font-family: inherit; font-size: inherit; }
+#qfc-root button { cursor: pointer; border: 1px solid #cbd5d0; background: #fff; color: #26372e; border-radius: 7px; padding: 6px 9px; min-height: 28px; }
+#qfc-root button:hover:not(:disabled) { background: #f0f5f0; }
+#qfc-root button:focus-visible, .qfc-message-star:focus-visible, #qfc-root textarea:focus-visible, #qfc-root input:focus-visible { outline: 2px solid #0b8157; outline-offset: 2px; }
+#qfc-root button:disabled { opacity: .5; cursor: not-allowed; }
+#qfc-root .qfc-dock { display: block; margin-left: auto; background: #12694c; color: #fff; border: 1px solid #12694c; box-shadow: 0 3px 14px #0002; border-radius: 999px; padding: 8px 15px; font-weight: 600; }
+#qfc-root .qfc-dock:hover { background: #07553b; }
+#qfc-root .qfc-panel { width: min(352px, calc(100vw - 24px)); max-height: min(640px, 73vh); display: flex; flex-direction: column; overflow: hidden; background: #fff; color: #253329; border: 1px solid #c6d2cc; border-radius: 14px; box-shadow: 0 9px 40px #0003; margin-bottom: 8px; }
+#qfc-root .qfc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 11px 12px 9px; border-bottom: 1px solid #e1e8e3; }
+#qfc-root .qfc-head strong { display: block; font-weight: 700; font-size: 14px; }
+#qfc-root .qfc-drag-handle { flex: 1; min-width: 0; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; border-radius: 6px; }
+#qfc-root .qfc-drag-handle.qfc-is-dragging { cursor: grabbing; }
+#qfc-root .qfc-drag-handle:focus-visible { outline: 2px solid #0b8157; outline-offset: 2px; }
+#qfc-root .qfc-drag-icon { color: #729484; font-size: 18px; vertical-align: -1px; }
+#qfc-root .qfc-head-actions { display: flex; gap: 4px; flex-shrink: 0; }
+#qfc-root .qfc-head-actions button { min-width: 29px; }
+#qfc-root .qfc-head small { display: block; color: #66776d; margin-top: 1px; }
+#qfc-root .qfc-nav { display: flex; border-bottom: 1px solid #e1e8e3; gap: 5px; padding: 5px 9px 0; }
+#qfc-root .qfc-nav button { flex: 1; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 2px; }
+#qfc-root .qfc-nav button.qfc-active { font-weight: 700; border-bottom-color: #116b4d; }
+#qfc-root .qfc-view { padding: 10px 11px 0; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+#qfc-root .qfc-label { display: block; font-size: 12px; font-weight: 600; margin: 0 0 4px; }
+#qfc-root textarea, #qfc-root input[type="search"], #qfc-root input[type="text"] { background: #fff; border: 1px solid #adbbb4; border-radius: 7px; color: #182c20; width: 100%; padding: 8px; resize: vertical; min-height: 38px; }
+#qfc-root .qfc-row { display: flex; gap: 5px; align-items: center; margin: 6px 0; }
+#qfc-root .qfc-wrap { flex-wrap: wrap; }
+#qfc-root .qfc-controls { padding: 3px 0 7px; border-bottom: 1px solid #e7ece8; }
+#qfc-root .qfc-primary { background: #176b4c; color: #fff; border-color: #176b4c; font-weight: 600; }
+#qfc-root .qfc-primary:hover:not(:disabled) { background: #0c563a; }
+#qfc-root .qfc-small { font-size: 12px; padding: 4px 7px; }
+#qfc-root .qfc-danger { margin-left: auto; }
+#qfc-root .qfc-items { overflow: visible; padding-bottom: 5px; }
+#qfc-root .qfc-item { padding: 9px 4px; border-bottom: 1px solid #e8ece9; }
+#qfc-root .qfc-preview { white-space: pre-wrap; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; }
+#qfc-root .qfc-meta { font-size: 11px; color: #607168; margin-bottom: 4px; text-transform: capitalize; }
+#qfc-root .qfc-item-actions { flex-wrap: wrap; }
+#qfc-root .qfc-empty { font-size: 12px; color: #68796f; text-align: center; padding: 9px 3px; }
+#qfc-root .qfc-backup { border-top: 1px solid #e3e9e4; padding: 5px 0 9px; }
+#qfc-root #qfc-workflow-editor { margin: 8px 0; background: #eef5ef; border-radius: 8px; padding: 8px; }
+#qfc-root .qfc-workflow-save { margin: 12px 0 9px; padding: 10px 0 3px; border-top: 1px solid #e2ebe4; }
+#qfc-root .qfc-workflow-save button { margin-top: 7px; }
+#qfc-root .qfc-workflow-title { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+#qfc-root .qfc-step { padding: 7px 0; border-top: 1px solid #dce7de; }
+#qfc-root #qfc-step-editor { max-height: min(340px, 45vh); overflow: auto; }
+#qfc-root #qfc-status { padding: 7px 12px; background: #f2f6f3; border-top: 1px solid #dee8e0; color: #42594a; font-size: 11px; flex-shrink: 0; }
+@media (prefers-color-scheme: dark) {
+  #qfc-root { color: #e5ece7; }
+  #qfc-root .qfc-panel { background: #202a25; color: #edf3ee; border-color: #4b6051; }
+  #qfc-root button { background: #2e3c33; color: #e7eee9; border-color: #506252; }
+  #qfc-root button:hover:not(:disabled) { background: #405345; }
+  #qfc-root .qfc-primary, #qfc-root .qfc-dock { background: #157650; color: #fff; border-color: #157650; }
+  #qfc-root .qfc-primary:hover:not(:disabled), #qfc-root .qfc-dock:hover { background: #10805a; }
+  #qfc-root textarea, #qfc-root input[type="search"], #qfc-root input[type="text"] { background: #17231c; border-color: #5d7063; color: #f1f6f3; }
+  #qfc-root .qfc-head, #qfc-root .qfc-nav, #qfc-root .qfc-item, #qfc-root .qfc-controls, #qfc-root .qfc-backup, #qfc-root .qfc-step, #qfc-root .qfc-workflow-save { border-color: #3b4b40; }
+  #qfc-root #qfc-status, #qfc-root #qfc-workflow-editor { background: #2a3a30; color: #d6e6da; border-color: #3b4b40; }
+  #qfc-root .qfc-head small, #qfc-root .qfc-meta, #qfc-root .qfc-empty { color: #b6c7ba; }
+}
+@media (max-width: 480px) { #qfc-root { right: 8px; bottom: 70px; } }

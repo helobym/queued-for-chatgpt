@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Local mock chat for smoke tests</title></head><body>
+  <main><div id="history"><div data-message-author-role="user"><div class="whitespace-pre-wrap">An earlier message</div></div></div></main>
+  <form id="mock-composer"><div id="prompt-textarea" contenteditable="true" role="textbox"></div><button type="button" data-testid="send-button">Send</button></form>
+  <script>
+    const memory = {};
+    const listeners = [];
+    window.chrome = window.chrome || {};
+    window.chrome.storage = {
+      local: {
+        async get(input) { const keys = typeof input === 'string' ? [input] : Array.isArray(input) ? input : Object.keys(input || {}); return Object.fromEntries(keys.map(k => [k, memory[k]])); },
+        async set(next) { for (const [k,v] of Object.entries(next)) { const old = memory[k]; memory[k] = JSON.parse(JSON.stringify(v)); for (const cb of listeners) cb({ [k]: { oldValue: old, newValue: memory[k] } }, 'local'); } }
+      }, onChanged: { addListener: cb => listeners.push(cb) }
+    };
+    const form = document.getElementById('mock-composer');
+    const editor = document.getElementById('prompt-textarea');
+    document.querySelector('[data-testid="send-button"]').addEventListener('click', () => {
+      const content = editor.innerText.trim();
+      if (!content) return;
+      const user = document.createElement('div'); user.setAttribute('data-message-author-role','user');
+      const text = document.createElement('div'); text.className='whitespace-pre-wrap'; text.innerText=content; user.append(text);
+      document.getElementById('history').append(user);
+      editor.innerHTML='';
+      const stop = document.createElement('button'); stop.type='button'; stop.dataset.testid='stop-button'; stop.innerText='Stop'; form.append(stop);
+      setTimeout(() => {
+        const assistant = document.createElement('div'); assistant.setAttribute('data-message-author-role','assistant');
+        assistant.textContent='Mock answer for: '+content;
+        const copy = document.createElement('button'); copy.setAttribute('aria-label','Copy'); copy.textContent='Copy'; assistant.append(copy);
+        document.getElementById('history').append(assistant);
+        stop.remove();
+      }, 350);
+    });
+  </script>
+</body></html>

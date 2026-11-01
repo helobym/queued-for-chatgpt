@@ -1,0 +1,1073 @@
+/* Queued for ChatGPT v1.2.1 — start saved workflows directly with exclusive send ownership. */
+(() => {
+  'use strict';
+  if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
+  globalThis.__qfcContentLoaded = true;
+  const C = globalThis.QFC;
+  const STORAGE = chrome.storage.local;
+  const SEND_SELECTORS = '[data-testid="send-button"], [data-testid="composer-submit-button"], button[type="submit"]';
+  // Recent ChatGPT app-shell renders messages under a timeline using search-unit
+  // attributes, not the legacy author-role attributes. Preserve both families.
+  const USER_SELECTORS = [
+    '[data-app-action-timeline-scroll][role="region"] [data-user-message-bubble="true"]',
+    '[data-app-action-timeline-scroll][role="region"] [data-chatgpt-search-unit-key$=":user"]',
+    '[data-message-author-role="user"]',
+    'section[data-turn="user"], article[data-turn="user"]',
+    '[data-user-message-bubble="true"]',
+    '[data-chatgpt-search-unit-key$=":user"]',
+    '[data-content-search-unit-key$=":user"]'
+  ];
+  const ASSISTANT_SELECTORS = [
+    '[data-app-action-timeline-scroll][role="region"] [data-chatgpt-search-unit-key$=":assistant"]',
+    '[data-app-action-timeline-scroll][role="region"] [data-content-search-unit-key$=":assistant"]',
+    '[data-message-author-role="assistant"]',
+    'section[data-turn="assistant"], article[data-turn="assistant"]',
+    '[data-chatgpt-search-unit-key$=":assistant"]',
+    '[data-content-search-unit-key$=":assistant"]',
+    '[data-markdown-text-style="assistant-message"]',
+    '[data-turn-key] [data-conversation-role="assistant"]'
+  ];
+  const USER_SELECTOR = USER_SELECTORS.join(', ');
+  const ASSISTANT_SELECTOR = ASSISTANT_SELECTORS.join(', ');
+  const STOP_SELECTORS = '[data-testid="stop-button"], button[aria-label="Stop generating"], button[aria-label="Stop response"]';
+  const PAGE_ID = C.newQueueItem('runtime').id;
+  const TEMP_SESSION_KEY = 'qfc_v1_temporary_conversation';
+  const PANEL_POSITION_KEY = 'qfc_panel_position_v1';
+  const state = {
+    route: null, queue: [], workflows: [], tab: 'queue', open: false,
+    editingQueueId: null, workflowDraft: null,
+    running: false, status: 'Paused', waiting: false, queueRev: -1, workflowsRev: -1,
+    routeLoading: false, storageHealthy: true
+  };
+  let root, queueList, workflowsList, statusLine, queueTextArea, workflowSearch;
+  let pageObserver, routeTimer, lastAssistantChange = Date.now();
+  let lastPathname = location.pathname;
+  let tempSubmittedAt = 0;
+  let navigateToExistingChat = false;
+  let newChatHandoff = null;
+  // UI placement is kept per browser tab, so moving the panel in Window A
+  // does not move the panel in Window B. Only non-sensitive pixel offsets are saved.
+  let panelOffsetX = 0, panelOffsetY = 0;
+  let panelDrag = null;
+  const signalListeners = new Set();
+
+  function wake() {
+    for (const fn of Array.from(signalListeners)) fn();
+  }
+  function signalOrTimeout(ms) {
+    return new Promise(resolve => {
+      let timer;
+      const finish = () => { clearTimeout(timer); signalListeners.delete(finish); resolve(); };
+      signalListeners.add(finish);
+      timer = setTimeout(finish, ms);
+    });
+  }
+  function setStatus(message) {
+    state.status = message;
+    renderHeader();
+  }
+  function notify(message) { setStatus(message); }
+  function currentRoute() { return C.conversationId(location.pathname); }
+  function isNewChatPage() {
+    return ['/', '/new'].includes(location.pathname) || /^\/g\/g-[a-zA-Z0-9_-]+\/?$/.test(location.pathname);
+  }
+  function getTemporaryRoute() {
+    let token;
+    try { token = sessionStorage.getItem(TEMP_SESSION_KEY); } catch (_) { /* ignored */ }
+    if (!token || !/^new:[a-zA-Z0-9_-]+$/.test(token)) {
+      token = 'new:' + PAGE_ID.replace(/[^a-zA-Z0-9_-]/g, '');
+      try { sessionStorage.setItem(TEMP_SESSION_KEY, token); } catch (_) { /* ignored */ }
+    }
+    return token;
+  }
+  function forgetTemporaryRoute() {
+    try { sessionStorage.removeItem(TEMP_SESSION_KEY); } catch (_) { /* ignored */ }
+  }
+  function makeOperationId() { return crypto.randomUUID ? crypto.randomUUID() : C.newQueueItem('op').id; }
+  async function rpc(command, fields = {}, operationId) {
+    const request = { app: 'qfc-v1.1', command, ...fields };
+    if (operationId) request.operationId = operationId;
+    // Retry the SAME operation id exactly once if a transient worker wakeup fails.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await chrome.runtime.sendMessage(request);
+        if (!response?.ok) throw new Error(response?.error || 'Storage coordinator unavailable.');
+        return response.data;
+      } catch (error) {
+        if (attempt || !/message port|receiving end|extension context|coordinator unavailable/i.test(String(error.message))) throw error;
+      }
+    }
+  }
+  function applyQueue(route, record) {
+    if (route !== state.route || !record || record.rev < state.queueRev) return;
+    state.queueRev = record.rev;
+    state.queue = C.cleanQueue(record.items);
+    render(); wake();
+  }
+  function applyWorkflows(record) {
+    if (!record || record.rev < state.workflowsRev) return;
+    state.workflowsRev = record.rev;
+    state.workflows = C.cleanWorkflows(record.items);
+    render();
+  }
+  async function queueOp(type, data = {}, route = state.route) {
+    if (!route) throw new Error('No active chat selected.');
+    try {
+      const record = await rpc('queue', { route, mutation: { type, ...data } }, makeOperationId());
+      applyQueue(route, record);
+      return record;
+    } catch (error) {
+      if (['sending', 'awaiting', 'complete'].includes(type)) pause('Storage or queue state changed; review the chat before resuming.');
+      throw error;
+    }
+  }
+  async function workflowOp(type, data = {}) {
+    const record = await rpc('workflows', { mutation: { type, ...data } }, makeOperationId());
+    applyWorkflows(record);
+    return record;
+  }
+  async function saveQueueWorkflow(name) {
+    const record = await rpc('saveQueueWorkflow', { route: state.route, name }, makeOperationId());
+    applyWorkflows(record);
+    notify('Workflow saved. You can load it into any conversation.');
+  }
+  async function editWithLock(fn) {
+    // Reject changes while a second tab owns this conversation's sender lock.
+    if (state.running) { notify('Pause the queue before editing.'); return false; }
+    if (!navigator.locks?.request) { notify('Web Locks unavailable; cannot safely edit the queue.'); return false; }
+    const route = state.route;
+    let acquired = false;
+    await navigator.locks.request('qfc-queue-' + route, { ifAvailable: true }, async lock => {
+      if (!lock) return;
+      acquired = true;
+      await fn();
+    });
+    if (!acquired) notify('This conversation is running in another tab. Pause it there before editing.');
+    return acquired;
+  }
+  async function loadRoute(route, { migrateFrom = null } = {}) {
+    state.routeLoading = true;
+    try {
+      const record = migrateFrom
+        ? await rpc('moveTemp', { source: migrateFrom, destination: route }, makeOperationId())
+        : await rpc('getQueue', { route });
+      if (state.route !== route) return;
+      applyQueue(route, record);
+      state.editingQueueId = null;
+      if (migrateFrom) forgetTemporaryRoute();
+    } catch (_) {
+      setStatus('Could not load saved queue.');
+      state.storageHealthy = false;
+    } finally { state.routeLoading = false; renderHeader(); }
+  }
+  function checkRoute() {
+    lastPathname = location.pathname;
+    const stable = currentRoute();
+    const route = stable || getTemporaryRoute();
+    if (route === state.route) return;
+    const previous = state.route;
+    // Only migrate a temporary queue after a user submission initiated from the composer.
+    // Clicking an existing chat must never attach the temporary queue to that other chat.
+    const expectedHandoff = Boolean(state.running && newChatHandoff &&
+      previous === newChatHandoff.from && stable && !navigateToExistingChat &&
+      newChatHandoff.clickedAt && Date.now() - newChatHandoff.clickedAt < 90000);
+    const migrateFrom = previous && previous.startsWith('new:') && stable &&
+      !navigateToExistingChat && (expectedHandoff || Date.now() - tempSubmittedAt < 90000)
+      ? previous : null;
+    navigateToExistingChat = false; tempSubmittedAt = 0;
+    if (state.running && !expectedHandoff) pause('Conversation changed — queue paused.');
+    if (expectedHandoff) newChatHandoff.destination = stable;
+    state.route = route;
+    state.queue = []; state.queueRev = -1;
+    setStatus(expectedHandoff ? 'New chat created — verifying first prompt…' :
+      migrateFrom ? 'New chat saved — review queue before resuming.' : 'Paused');
+    loadRoute(route, { migrateFrom });
+    if (stable && !migrateFrom && (!previous || !previous.startsWith('new:'))) forgetTemporaryRoute();
+  }
+
+  function makeElement(tag, className, textValue) {
+    const el = document.createElement(tag);
+    if (className) el.className = className;
+    if (textValue != null) el.textContent = String(textValue);
+    return el;
+  }
+  function actionButton(label, action, id, title) {
+    const button = makeElement('button', 'qfc-small', label);
+    button.type = 'button'; button.dataset.action = action;
+    if (id) button.dataset.id = id;
+    button.title = title || label;
+    button.setAttribute('aria-label', title || label);
+    return button;
+  }
+  function initPanel() {
+    root = document.createElement('div');
+    root.id = 'qfc-root';
+    root.innerHTML = `
+      <button type="button" class="qfc-dock" data-action="toggle" aria-expanded="false" aria-controls="qfc-panel">☷ Queue <span id="qfc-dock-count">0</span></button>
+      <section class="qfc-panel" id="qfc-panel" aria-label="Queued for ChatGPT" hidden>
+        <header class="qfc-head">
+          <div class="qfc-drag-handle" role="button" tabindex="0"
+               title="Drag to move · arrow keys to nudge · Shift + arrow for larger steps"
+               aria-label="Move Queue panel. Drag with mouse or touch, or use arrow keys.">
+            <strong><span class="qfc-drag-icon" aria-hidden="true">⠿</span> Queued for ChatGPT</strong>
+            <small>Drag here to move · local · lightweight</small>
+          </div>
+          <div class="qfc-head-actions">
+            <button type="button" class="qfc-small" data-action="reset-position" title="Reset panel position" aria-label="Reset panel position">⌖</button>
+            <button type="button" class="qfc-small" data-action="toggle" title="Close panel" aria-label="Close panel">✕</button>
+          </div>
+        </header>
+        <nav class="qfc-nav" aria-label="Extension sections">
+          <button type="button" data-action="tab-queue" class="qfc-active">Queue <span id="qfc-count">0</span></button>
+          <button type="button" data-action="tab-workflows">☷ Workflows <span id="qfc-workflow-count">0</span></button>
+        </nav>
+        <div id="qfc-queue-view" class="qfc-view">
+          <label class="qfc-label" for="qfc-compose">Next prompt</label>
+          <textarea id="qfc-compose" rows="3" maxlength="20000" placeholder="Write a prompt to queue…"></textarea>
+          <div class="qfc-row qfc-wrap">
+            <button type="button" class="qfc-primary" id="qfc-add" data-action="add">+ Add to queue</button>
+            <button type="button" class="qfc-small" id="qfc-cancel" data-action="cancel-edit" hidden>Cancel edit</button>
+          </div>
+          <div class="qfc-row qfc-controls">
+            <button type="button" class="qfc-primary" data-action="start" id="qfc-start">▶ Start</button>
+            <button type="button" class="qfc-small" data-action="pause" id="qfc-pause" disabled>Ⅱ Pause</button>
+            <button type="button" class="qfc-small qfc-danger" data-action="clear">Clear</button>
+          </div>
+          <div id="qfc-queue-items" class="qfc-items" aria-live="polite"></div>
+          <div class="qfc-workflow-save">
+            <label class="qfc-label" for="qfc-workflow-name">Save pending queue as a workflow</label>
+            <input id="qfc-workflow-name" type="text" maxlength="100" placeholder="Workflow name (e.g. Research steps)" autocomplete="off" />
+            <button type="button" class="qfc-small" data-action="save-queue-workflow">Save pending steps as workflow</button>
+          </div>
+        </div>
+        <div id="qfc-workflows-view" class="qfc-view" hidden>
+          <label class="qfc-label" for="qfc-search">Saved queue workflows</label>
+          <input id="qfc-search" type="search" placeholder="Search workflows…" autocomplete="off" />
+          <div class="qfc-row"><button type="button" class="qfc-small" data-action="new-workflow">+ Create workflow</button></div>
+          <div id="qfc-workflow-editor" hidden>
+            <label class="qfc-label" for="qfc-edit-workflow-name">Workflow name</label>
+            <input id="qfc-edit-workflow-name" type="text" maxlength="100" autocomplete="off" />
+            <label class="qfc-label">Prompts in sending order</label>
+            <div id="qfc-step-editor"></div>
+            <div class="qfc-row qfc-wrap"><button type="button" class="qfc-small" data-action="add-workflow-step">+ Add step</button>
+              <button type="button" class="qfc-primary" data-action="save-workflow-edit">Save workflow</button>
+              <button type="button" class="qfc-small" data-action="cancel-workflow-edit">Cancel</button></div>
+          </div>
+          <div id="qfc-workflow-items" class="qfc-items" aria-live="polite"></div>
+          <div class="qfc-row qfc-backup qfc-wrap">
+            <button type="button" class="qfc-small" data-action="export-workflows">Export workflows</button>
+            <button type="button" class="qfc-small" data-action="import-workflows">Import workflows</button>
+            <button type="button" class="qfc-small" data-action="export-legacy-favorites" title="Backup old Favorites stored before version 1.2">Backup old Favorites</button>
+            <input type="file" id="qfc-import-file" accept=".json,application/json" hidden>
+          </div>
+        </div>
+        <footer id="qfc-status" role="status">Paused</footer>
+      </section>`;
+    document.body.append(root);
+    queueList = root.querySelector('#qfc-queue-items');
+    workflowsList = root.querySelector('#qfc-workflow-items');
+    statusLine = root.querySelector('#qfc-status');
+    queueTextArea = root.querySelector('#qfc-compose');
+    workflowSearch = root.querySelector('#qfc-search');
+    root.addEventListener('click', event => { onPanelClick(event).catch(error => notify(error.message || 'Unable to save changes.')); });
+    workflowSearch.addEventListener('input', renderWorkflows);
+    root.querySelector('#qfc-import-file').addEventListener('change', importFile);
+    root.addEventListener('input', event => {
+      const draft = state.workflowDraft;
+      if (!draft) return;
+      if (event.target.id === 'qfc-edit-workflow-name') draft.name = event.target.value;
+      const stepIndex = event.target.dataset?.stepIndex;
+      if (stepIndex != null && draft.steps[Number(stepIndex)] !== undefined) draft.steps[Number(stepIndex)] = event.target.value;
+    });
+    setupPanelDragging();
+  }
+  function getStoredPanelPosition() {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(PANEL_POSITION_KEY) || 'null');
+      if (stored && Number.isFinite(stored.x) && Number.isFinite(stored.y)) {
+        // Defend against corrupted values and unexpected site-written data.
+        return { x: Math.max(-10000, Math.min(10000, stored.x)),
+                 y: Math.max(-10000, Math.min(10000, stored.y)) };
+      }
+    } catch (_) { /* Session storage can be unavailable in restricted contexts. */ }
+    return { x: 0, y: 0 };
+  }
+  function savePanelPosition() {
+    try { sessionStorage.setItem(PANEL_POSITION_KEY, JSON.stringify({ x: panelOffsetX, y: panelOffsetY })); }
+    catch (_) { /* Dragging still works even if persistence is unavailable. */ }
+  }
+  function setPanelPosition(x, y, { constrain = true, save = false } = {}) {
+    if (!root) return;
+    let nextX = x, nextY = y;
+    if (constrain) {
+      const bounds = root.getBoundingClientRect();
+      const baseX = bounds.left - panelOffsetX;
+      const baseY = bounds.top - panelOffsetY;
+      const margin = 8;
+      const minX = margin - baseX;
+      const maxX = innerWidth - margin - bounds.width - baseX;
+      const minY = margin - baseY;
+      const maxY = innerHeight - margin - bounds.height - baseY;
+      // The panel fits the viewport under normal conditions. If the viewport
+      // becomes extremely small, keep the title visible rather than losing it.
+      nextX = Math.max(minX, Math.min(maxX < minX ? minX : maxX, x));
+      nextY = Math.max(minY, Math.min(maxY < minY ? minY : maxY, y));
+    }
+    panelOffsetX = Math.round(nextX);
+    panelOffsetY = Math.round(nextY);
+    root.style.transform = `translate3d(${panelOffsetX}px, ${panelOffsetY}px, 0)`;
+    if (save) savePanelPosition();
+  }
+  function resetPanelPosition() {
+    setPanelPosition(0, 0, { save: true });
+    notify('Panel position reset.');
+  }
+  function setupPanelDragging() {
+    const handle = root.querySelector('.qfc-drag-handle');
+    if (!handle) return;
+    const stored = getStoredPanelPosition();
+    setPanelPosition(stored.x, stored.y, { constrain: false });
+    handle.addEventListener('pointerdown', event => {
+      if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      panelDrag = {
+        id: event.pointerId, x: event.clientX, y: event.clientY,
+        startX: panelOffsetX, startY: panelOffsetY, moved: false
+      };
+      handle.setPointerCapture(event.pointerId);
+      handle.classList.add('qfc-is-dragging');
+      event.preventDefault();
+    });
+    handle.addEventListener('pointermove', event => {
+      if (!panelDrag || panelDrag.id !== event.pointerId) return;
+      const dx = event.clientX - panelDrag.x, dy = event.clientY - panelDrag.y;
+      if (!panelDrag.moved && Math.hypot(dx, dy) < 4) return;
+      panelDrag.moved = true;
+      setPanelPosition(panelDrag.startX + dx, panelDrag.startY + dy);
+    });
+    function finishDrag(event) {
+      if (!panelDrag || panelDrag.id !== event.pointerId) return;
+      const changed = panelDrag.moved;
+      panelDrag = null;
+      handle.classList.remove('qfc-is-dragging');
+      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
+      if (changed) savePanelPosition();
+    }
+    handle.addEventListener('pointerup', finishDrag);
+    handle.addEventListener('pointercancel', finishDrag);
+    handle.addEventListener('lostpointercapture', event => {
+      if (panelDrag?.id === event.pointerId) {
+        panelDrag = null;
+        handle.classList.remove('qfc-is-dragging');
+        savePanelPosition();
+      }
+    });
+    handle.addEventListener('keydown', event => {
+      const steps = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      if (event.key === 'Home') {
+        event.preventDefault(); resetPanelPosition(); return;
+      }
+      const movement = steps[event.key];
+      if (!movement) return;
+      event.preventDefault();
+      const size = event.shiftKey ? 40 : 10;
+      setPanelPosition(panelOffsetX + movement[0] * size,
+                       panelOffsetY + movement[1] * size, { save: true });
+    });
+    window.addEventListener('resize', () => setPanelPosition(panelOffsetX, panelOffsetY, { save: true }));
+  }
+  function renderHeader() {
+    if (!root) return;
+    const count = state.queue.length;
+    root.querySelector('#qfc-count').textContent = count;
+    root.querySelector('#qfc-dock-count').textContent = count;
+    root.querySelector('#qfc-workflow-count').textContent = state.workflows.length;
+    root.querySelector('.qfc-dock').setAttribute('aria-expanded', String(state.open));
+    root.querySelector('#qfc-panel').hidden = !state.open;
+    root.querySelector('#qfc-queue-view').hidden = state.tab !== 'queue';
+    root.querySelector('#qfc-workflows-view').hidden = state.tab !== 'workflows';
+    root.querySelector('[data-action="tab-queue"]').classList.toggle('qfc-active', state.tab === 'queue');
+    root.querySelector('[data-action="tab-workflows"]').classList.toggle('qfc-active', state.tab === 'workflows');
+    const btn = root.querySelector('#qfc-start');
+    const canStart = state.route?.startsWith('chat:') ||
+      (state.route?.startsWith('new:') && isNewChatPage());
+    btn.disabled = state.running || state.routeLoading || !state.storageHealthy || !state.queue.length || !canStart;
+    root.querySelector('#qfc-pause').disabled = !state.running;
+    statusLine.textContent = state.route?.startsWith('new:') && !state.running && state.status === 'Paused'
+      ? isNewChatPage()
+        ? 'New chat: Start sends the first queued prompt to create this conversation.'
+        : 'Open New Chat to start a queue.'
+      : state.status;
+  }
+  function renderQueue() {
+    if (!queueList) return;
+    const frag = document.createDocumentFragment();
+    if (!state.queue.length) frag.append(makeElement('p', 'qfc-empty', 'Queue empty. Add prompts above.'));
+    state.queue.forEach((item, index) => {
+      const row = makeElement('div', 'qfc-item');
+      const title = makeElement('div', 'qfc-preview', item.text);
+      title.title = item.text;
+      const meta = makeElement('div', 'qfc-meta', `${index + 1}. ${item.status === 'pending' ? 'Pending' : item.status === 'sending' ? 'Sending — check ChatGPT' : 'Awaiting response'}`);
+      const actions = makeElement('div', 'qfc-row qfc-item-actions');
+      if (item.status === 'pending') {
+        actions.append(actionButton('↑', 'up', item.id, 'Move up'), actionButton('↓', 'down', item.id, 'Move down'),
+          actionButton('Edit', 'edit', item.id, 'Edit queued prompt'), actionButton('×', 'remove', item.id, 'Remove queued prompt'));
+      } else {
+        actions.append(actionButton('✓ Done', 'confirm-done', item.id, 'Confirm completed and remove from queue'),
+          actionButton('↺ Retry', 'confirm-retry', item.id, 'Confirm retry; may cause a duplicate send'));
+      }
+      row.append(meta, title, actions);
+      frag.append(row);
+    });
+    queueList.replaceChildren(frag);
+  }
+  function renderWorkflows() {
+    if (!workflowsList) return;
+    const query = C.normalize(workflowSearch.value).toLocaleLowerCase();
+    const found = state.workflows.filter(w =>
+      C.normalize(w.name).toLocaleLowerCase().includes(query) ||
+      w.steps.some(step => C.normalize(step).toLocaleLowerCase().includes(query)));
+    const frag = document.createDocumentFragment();
+    if (!found.length) frag.append(makeElement('p', 'qfc-empty', 'No saved workflows. Save the pending queue or create a workflow here.'));
+    for (const workflow of found) {
+      const row = makeElement('div', 'qfc-item');
+      row.append(makeElement('div', 'qfc-workflow-title', workflow.name));
+      row.append(makeElement('div', 'qfc-meta', `${workflow.steps.length} steps`));
+      const preview = makeElement('div', 'qfc-preview', workflow.steps.map((step, i) => `${i + 1}. ${step}`).join('\n'));
+      preview.title = workflow.steps.join('\n\n');
+      row.append(preview);
+      const actions = makeElement('div', 'qfc-row qfc-item-actions');
+      const startButton = actionButton('▶ Start Workflow', 'start-workflow', workflow.id,
+        'Add this workflow to the current conversation and immediately begin sending');
+      startButton.classList.add('qfc-primary');
+      actions.append(startButton,
+        actionButton('Edit', 'edit-workflow', workflow.id, 'Edit name and steps'),
+        actionButton('Delete', 'remove-workflow', workflow.id, 'Delete saved workflow'));
+      row.append(actions); frag.append(row);
+    }
+    workflowsList.replaceChildren(frag);
+  }
+  function renderWorkflowEditor() {
+    const editor = root.querySelector('#qfc-workflow-editor');
+    const draft = state.workflowDraft;
+    editor.hidden = !draft;
+    if (!draft) return;
+    root.querySelector('#qfc-edit-workflow-name').value = draft.name;
+    const list = root.querySelector('#qfc-step-editor');
+    const frag = document.createDocumentFragment();
+    draft.steps.forEach((step, index) => {
+      const row = makeElement('div', 'qfc-step');
+      const label = makeElement('label', 'qfc-label', `Step ${index + 1}`);
+      label.htmlFor = `qfc-step-${index}`;
+      const text = makeElement('textarea');
+      text.id = `qfc-step-${index}`;
+      text.dataset.stepIndex = String(index);
+      text.rows = 3; text.maxLength = C.MAX_PROMPT_LENGTH;
+      text.value = step;
+      const buttons = makeElement('div', 'qfc-row qfc-item-actions');
+      buttons.append(actionButton('↑', 'workflow-step-up', String(index), 'Move step up'),
+        actionButton('↓', 'workflow-step-down', String(index), 'Move step down'),
+        actionButton('× Remove', 'workflow-step-remove', String(index), 'Remove step'));
+      row.append(label, text, buttons); frag.append(row);
+    });
+    list.replaceChildren(frag);
+  }
+  function openWorkflowEditor(workflow) {
+    state.workflowDraft = workflow ? {
+      id: workflow.id, name: workflow.name, steps: [...workflow.steps], expectedUpdatedAt: workflow.updatedAt
+    } : {id: null, name: '', steps: [''], expectedUpdatedAt: null};
+    setTab('workflows');
+    renderWorkflowEditor();
+    root.querySelector('#qfc-edit-workflow-name').focus();
+  }
+  function render() { renderHeader(); renderQueue(); renderWorkflows(); }
+  async function addPrompt(text) {
+    if (!C.validText(text)) { notify('Enter a prompt (up to 20,000 characters).'); return false; }
+    try { await queueOp('add', { text }); render(); return true; }
+    catch (error) { notify(error.message || 'Could not add prompt.'); return false; }
+  }
+  function pause(message = 'Paused') {
+    state.running = false;
+    newChatHandoff = null;
+    setStatus(message);
+    wake();
+  }
+  function setTab(tab) { state.tab = tab; renderHeader(); }
+  async function onPanelClick(event) {
+    const button = event.target.closest('button[data-action]');
+    if (!button) return;
+    const action = button.dataset.action, id = button.dataset.id;
+    const queueItem = state.queue.find(item => item.id === id);
+    const workflow = state.workflows.find(item => item.id === id);
+    switch (action) {
+      case 'toggle':
+        state.open = !state.open;
+        chrome.storage.local.set({ [C.SETTINGS_KEY]: { open: state.open } }).catch(() => {});
+        renderHeader();
+        // Expanded panel is wider/taller than the dock; clamp after opening.
+        setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
+        break;
+      case 'reset-position': resetPanelPosition(); break;
+      case 'tab-queue': setTab('queue'); break;
+      case 'tab-workflows': setTab('workflows'); break;
+      case 'add': {
+        const content = queueTextArea.value;
+        if (state.editingQueueId) {
+          const edited = state.queue.find(item => item.id === state.editingQueueId);
+          if (!edited || edited.status !== 'pending') { notify('Cannot edit a message already sent.'); break; }
+          if (!C.validText(content)) { notify('Prompt must be 1–20,000 characters.'); break; }
+          if (await editWithLock(() => queueOp('edit', { id: edited.id, text: content }))) cancelQueueEdit();
+          render();
+        } else {
+          if (!C.validText(content)) { notify('Enter a prompt (up to 20,000 characters).'); break; }
+          if (await addPrompt(content)) queueTextArea.value = '';
+        }
+        break;
+      }
+      case 'cancel-edit': cancelQueueEdit(); break;
+      case 'start': startQueue(); break;
+      case 'pause': pause('Paused by you.'); break;
+      case 'clear':
+        if (!state.queue.length || !confirm('Clear all pending queued prompts for this conversation?')) break;
+        if (state.running) pause('Queue cleared.');
+        await editWithLock(() => queueOp('clear')); render(); break;
+      case 'up': case 'down':
+        if (!queueItem || state.running) { notify('Pause before reordering.'); break; }
+        const i = state.queue.findIndex(item => item.id === id);
+        const j = i + (action === 'up' ? -1 : 1);
+        if (j < 0 || j >= state.queue.length || state.queue[j].status !== 'pending' || queueItem.status !== 'pending') break;
+        await editWithLock(() => queueOp('move', { id, direction: action })); render(); break;
+      case 'edit':
+        if (!queueItem || queueItem.status !== 'pending' || state.running) { notify('Pause before editing.'); break; }
+        state.editingQueueId = queueItem.id;
+        queueTextArea.value = queueItem.text;
+        root.querySelector('#qfc-add').textContent = 'Save prompt';
+        root.querySelector('#qfc-cancel').hidden = false;
+        queueTextArea.focus(); break;
+      case 'remove':
+        if (!queueItem || queueItem.status !== 'pending' || state.running) { notify('Pause before removing.'); break; }
+        await editWithLock(() => queueOp('remove', { id })); render(); break;
+      case 'save-queue-workflow': {
+        const nameInput = root.querySelector('#qfc-workflow-name');
+        if (!C.validWorkflowName(nameInput.value)) { notify('Enter a workflow name (1–100 characters).'); break; }
+        await saveQueueWorkflow(nameInput.value);
+        nameInput.value = '';
+        setTab('workflows');
+        break;
+      }
+      case 'confirm-done':
+        if (!queueItem || state.running || state.queue[0]?.id !== id) { notify('Pause first; resolve the oldest uncertain prompt.'); break; }
+        if (!confirm('Confirm this prompt was sent and its response is complete? Remove it and allow the next queue item to run?')) break;
+        if (await editWithLock(() => queueOp('confirm-done', { id, confirmed: true }))) setStatus('Confirmed complete. Select Start to continue.');
+        render(); break;
+      case 'confirm-retry':
+        if (!queueItem || state.running || state.queue[0]?.id !== id) { notify('Pause first; resolve the oldest uncertain prompt.'); break; }
+        if (!confirm('Retry might send a duplicate. Have you checked that this prompt was NOT already sent?')) break;
+        if (await editWithLock(() => queueOp('confirm-retry', { id, confirmed: true }))) setStatus('Ready to retry. Select Start.');
+        render(); break;
+      case 'start-workflow':
+        if (workflow) startQueue(workflow.id);
+        break;
+      case 'new-workflow': openWorkflowEditor(null); break;
+      case 'edit-workflow': if (workflow) openWorkflowEditor(workflow); break;
+      case 'cancel-workflow-edit':
+        state.workflowDraft = null; renderWorkflowEditor(); break;
+      case 'add-workflow-step': {
+        if (!state.workflowDraft) break;
+        if (state.workflowDraft.steps.length >= C.MAX_QUEUE) { notify('Maximum 100 steps per workflow.'); break; }
+        state.workflowDraft.steps.push(''); renderWorkflowEditor();
+        root.querySelector(`#qfc-step-${state.workflowDraft.steps.length - 1}`).focus();
+        break;
+      }
+      case 'workflow-step-up': case 'workflow-step-down': case 'workflow-step-remove': {
+        const draft = state.workflowDraft;
+        const stepIndex = Number(id);
+        if (!draft || !Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex >= draft.steps.length) break;
+        if (action === 'workflow-step-remove') draft.steps.splice(stepIndex, 1);
+        else {
+          const neighbor = stepIndex + (action === 'workflow-step-up' ? -1 : 1);
+          if (neighbor < 0 || neighbor >= draft.steps.length) break;
+          [draft.steps[stepIndex], draft.steps[neighbor]] = [draft.steps[neighbor], draft.steps[stepIndex]];
+        }
+        renderWorkflowEditor(); break;
+      }
+      case 'save-workflow-edit': {
+        const draft = state.workflowDraft;
+        if (!draft) break;
+        if (!C.validWorkflowName(draft.name)) { notify('Workflow name must be 1–100 characters.'); break; }
+        try { C.cleanWorkflowSteps(draft.steps); }
+        catch (error) { notify(error.message); break; }
+        await workflowOp(draft.id ? 'edit' : 'create', {
+          ...(draft.id ? {id: draft.id, expectedUpdatedAt: draft.expectedUpdatedAt} : {}),
+          name: draft.name, steps: draft.steps
+        });
+        state.workflowDraft = null;
+        renderWorkflowEditor();
+        notify('Workflow saved.');
+        break;
+      }
+      case 'remove-workflow':
+        if (workflow && confirm(`Delete saved workflow “${workflow.name}”? Existing queued prompts are unaffected.`)) {
+          await workflowOp('remove', {id: workflow.id, expectedUpdatedAt: workflow.updatedAt});
+          notify('Workflow deleted.');
+        }
+        break;
+      case 'export-workflows':
+        downloadJson({app: 'Queued for ChatGPT', kind: 'workflows', version: 3,
+          exportedAt: new Date().toISOString(), workflows: state.workflows}, 'queued-for-chatgpt-workflows.json');
+        notify('Workflow backup exported.');
+        break;
+      case 'export-legacy-favorites': {
+        const backup = await rpc('exportLegacyFavorites');
+        downloadJson(backup, 'queued-for-chatgpt-old-favorites.json');
+        notify('Old Favorites exported. They remain stored, but are no longer shown.');
+        break;
+      }
+      case 'import-workflows': root.querySelector('#qfc-import-file').click(); break;
+      default: break;
+    }
+  }
+  function cancelQueueEdit() {
+    state.editingQueueId = null; queueTextArea.value = '';
+    root.querySelector('#qfc-add').textContent = '+ Add to queue';
+    root.querySelector('#qfc-cancel').hidden = true;
+  }
+  function downloadJson(payload, filename) {
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'}));
+    const anchor = document.createElement('a');
+    anchor.href = url; anchor.download = filename;
+    root.append(anchor); anchor.click(); anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  async function importFile(event) {
+    const file = event.target.files?.[0]; event.target.value = '';
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { notify('Workflow backup is too large (max 2 MB).'); return; }
+    try {
+      const data = JSON.parse(await file.text());
+      const before = state.workflows.length;
+      await workflowOp('import', {payload: data});
+      notify(`Imported ${state.workflows.length - before} new workflows.`);
+    } catch (error) { notify(error.message || 'Could not import workflow backup.'); }
+  }
+
+  // DOM detection is deliberately conservative: never call network endpoints or reuse credentials.
+  function findEditor() {
+    const options = document.querySelectorAll('#prompt-textarea, [data-testid="composer-input"], [contenteditable="true"][role="textbox"], textarea[data-id="root"]');
+    for (const el of options) {
+      if (el.closest('#qfc-root') || !el.isConnected || el.getClientRects().length === 0) continue;
+      if (el.isContentEditable || el.matches('textarea')) return el;
+    }
+    return null;
+  }
+  function editorText(editor) {
+    return editor ? (editor.matches('textarea') ? editor.value : (editor.innerText || '').replace(/\u200b/g, '')) : '';
+  }
+  function composerArea(editor) {
+    return editor?.closest('form') || editor?.closest('[data-testid="composer"]') || null;
+  }
+  function findSendButton(editor) {
+    const area = composerArea(editor);
+    if (!area) return null;
+    const candidates = [...area.querySelectorAll(SEND_SELECTORS)].filter(button => button.tagName === 'BUTTON' && button.getClientRects().length);
+    const nonStop = candidates.filter(button => !button.matches(STOP_SELECTORS) && !button.querySelector('svg.icon-primary-action path[d^="M4.5 5.75"]'));
+    return nonStop.length === 1 ? nonStop[0] : null;
+  }
+  function isGenerating() {
+    const editor = findEditor();
+    const area = composerArea(editor);
+    if (!area) return false;
+    if (area.querySelector(STOP_SELECTORS)) return true;
+    // A square Stop glyph used in a ChatGPT composer design; do not classify other icons.
+    return Boolean(area.querySelector('button svg.icon-primary-action path[d^="M4.5 5.75"]'));
+  }
+  // Prefer one markup family so nested message wrappers are not double-counted.
+  // Scoped timeline markers avoid hidden pre-rendered conversation copies.
+  function selectMessages(selectors) {
+    for (const selector of selectors) {
+      const found = [...document.querySelectorAll(selector)]
+        .filter(node => !node.closest('#qfc-root'));
+      if (found.length) return found;
+    }
+    return [];
+  }
+  function userMessages() { return selectMessages(USER_SELECTORS); }
+  function assistantMessages() { return selectMessages(ASSISTANT_SELECTORS); }
+  function assistantText(message) {
+    if (!message) return '';
+    const pieces = message.querySelectorAll('[data-markdown-text-style="assistant-message"], .markdown, .prose');
+    if (pieces.length) return [...pieces].map(node => node.innerText || node.textContent || '').join(' ').trim();
+    // The role marker in some builds is only an h4; the answer is its sibling.
+    if (message.matches('[data-conversation-role="assistant"]')) {
+      const unit = message.closest('[data-content-search-unit-key], [data-chatgpt-search-unit-key], [data-turn-key]');
+      if (unit && unit !== message) return (unit.innerText || unit.textContent || '').trim();
+    }
+    return (message.innerText || message.textContent || '').trim();
+  }
+  function extractMessage(message) {
+    const specific = message.querySelector('[data-testid="user-message"], .whitespace-pre-wrap, .prose, .markdown');
+    const source = specific || message;
+    if (specific && !specific.querySelector('.qfc-message-star')) return (specific.innerText || specific.textContent || '').trim();
+    const copy = source.cloneNode(true);
+    copy.querySelectorAll('.qfc-message-star, button, svg, [aria-hidden="true"]').forEach(el => el.remove());
+    return (copy.innerText || copy.textContent || '').trim();
+  }
+  function writeEditor(editor, text) {
+    if (editor.matches('textarea')) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      if (!setter) return false;
+      setter.call(editor, text);
+      editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }));
+      return true;
+    }
+    if (!editor.isContentEditable) return false;
+    editor.focus();
+    const selection = window.getSelection();
+    if (!selection) return false;
+    const range = document.createRange(); range.selectNodeContents(editor);
+    selection.removeAllRanges(); selection.addRange(range);
+    // The browser sends native editing events understood by ProseMirror/Tiptap.
+    return document.execCommand('insertText', false, text);
+  }
+  function healthyRoute(route) {
+    return state.running && state.route === route &&
+      (route.startsWith('new:') ? !currentRoute() && isNewChatPage() : currentRoute() === route);
+  }
+  async function waitForComposerIdle(route, deadline) {
+    while (healthyRoute(route) && Date.now() < deadline) {
+      const editor = findEditor();
+      if (editor && !isGenerating()) {
+        if (C.normalize(editorText(editor))) { pause('ChatGPT has an unsent draft. Queue paused to protect it.'); return false; }
+        // Guard against a momentary stop-button disappearance during regeneration.
+        await signalOrTimeout(1400);
+        if (healthyRoute(route) && !isGenerating()) return true;
+      } else {
+        setStatus('Waiting for ChatGPT to finish…');
+        await signalOrTimeout(Math.min(5000, deadline - Date.now()));
+      }
+    }
+    if (state.running && Date.now() >= deadline) pause('ChatGPT did not become ready. Queue paused.');
+    return false;
+  }
+  async function sendMessage(text, route) {
+    const editor = findEditor();
+    if (!editor || !healthyRoute(route) || isGenerating()) return false;
+    if (C.normalize(editorText(editor))) { pause('Unsent ChatGPT draft detected. Queue paused.'); return false; }
+    if (!writeEditor(editor, text)) { pause('Composer changed; cannot safely insert prompt.'); return false; }
+    const deadline = Date.now() + 3000;
+    while (Date.now() < deadline && healthyRoute(route)) {
+      const button = findSendButton(editor);
+      if (button && !button.disabled && C.normalize(editorText(editor)) === C.normalize(text) && !isGenerating()) {
+        // Record the intentional send before clicking: the site may update its URL immediately.
+        if (newChatHandoff?.from === route) newChatHandoff.clickedAt = Date.now();
+        button.click();
+        return true;
+      }
+      await signalOrTimeout(250);
+    }
+    pause('Could not verify the Send button. Check draft before retrying.');
+    return false;
+  }
+  async function waitForReceipt(text, oldUser, route) {
+    const deadline = Date.now() + 15000;
+    while (healthyRoute(route) && Date.now() < deadline) {
+      const all = userMessages();
+      const newest = all[all.length - 1];
+      if (newest && newest !== oldUser && C.normalize(extractMessage(newest)) === C.normalize(text)) return true;
+      await signalOrTimeout(Math.min(1250, deadline - Date.now()));
+    }
+    return false;
+  }
+  async function waitForFirstTurnEvidence(text, oldUser, oldAssistant, route) {
+    // The first send creates a chat and can re-render the original user turn.
+    // ChatGPT sometimes changes the user's message markup during that transition;
+    // requiring an exact user-bubble match alone causes a false negative.
+    // A *new assistant reply* in the *newly assigned chat*, following our Send
+    // click, is independent confirmation that ChatGPT accepted a first turn.
+    // Response completion is checked SEPARATELY before any second send.
+    const deadline = Date.now() + 2 * 60 * 1000;
+    let sawStop = false;
+    while (healthyRoute(route) && Date.now() < deadline) {
+      if (isGenerating()) sawStop = true;
+      const latestUser = userMessages().at(-1);
+      if (latestUser && latestUser !== oldUser &&
+          C.normalize(extractMessage(latestUser)) === C.normalize(text)) {
+        return { receipt: 'user', sawStop };
+      }
+      const latestAssistant = assistantMessages().at(-1);
+      if (latestAssistant && latestAssistant !== oldAssistant &&
+          C.normalize(assistantText(latestAssistant))) {
+        // An assistant turn cannot be used as proof of *completion*, only of
+        // submission. The existing waitForResponse still verifies completion.
+        return { receipt: 'assistant', sawStop };
+      }
+      await signalOrTimeout(Math.min(1500, deadline - Date.now()));
+    }
+    return null;
+  }
+  function assistantHasCompletedActions(last) {
+    if (!last) return false;
+    const turn = last.closest('[data-turn-key], [data-testid^="conversation-turn-"]') ||
+      last.parentElement?.parentElement || last;
+    // Copy/regenerate controls become available on a completed response. The
+    // current app-shell nests these in .turn-action-controls. Require the
+    // control to follow the assistant content (not the user's earlier footer).
+    const buttons = turn.querySelectorAll(
+      '[data-testid="copy-turn-action-button"], button[aria-label="Copy"], ' +
+      'button[aria-label="Copy response"], button[data-testid="copy-button"], ' +
+      'button[aria-label="Regenerate"], button[aria-label="Regenerate response"], ' +
+      '.turn-action-controls button'
+    );
+    return [...buttons].some(button => last.contains(button) ||
+      Boolean(last.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING));
+  }
+  async function waitForResponse(oldAssistant, route, sawStopEarlier = false) {
+    const deadline = Date.now() + 10 * 60 * 1000;
+    let sawStop = sawStopEarlier, sawReply = false;
+    let lastReply = null, lastText = '', replyChangedAt = Date.now();
+    while (healthyRoute(route) && Date.now() < deadline) {
+      const stop = isGenerating();
+      if (stop) sawStop = true;
+      const all = assistantMessages();
+      const newest = all[all.length - 1];
+      if (newest && newest !== oldAssistant) {
+        lastReply = newest;
+        const text = C.normalize(assistantText(newest));
+        if (text && text !== lastText) { lastText = text; replyChangedAt = Date.now(); }
+        if (text) sawReply = true;
+      }
+      const stableFor = Date.now() - Math.max(lastAssistantChange, replyChangedAt);
+      // Never treat merely an idle composer or absent Stop button as completion.
+      // A real new assistant reply AND an observed Stop lifecycle or completion
+      // control are both required, plus settling time.
+      if (sawReply && !stop && stableFor >= 1700 &&
+          (sawStop || assistantHasCompletedActions(lastReply))) return true;
+      const remaining = deadline - Date.now();
+      if (!remaining) break;
+      await signalOrTimeout(Math.min(remaining, sawReply && !stop ? 1800 : 5000));
+    }
+    return false;
+  }
+  async function runQueue(route) {
+    try {
+      while (healthyRoute(route) && state.queue.length) {
+        const item = state.queue[0];
+        if (item.status !== 'pending') {
+          pause('Review uncertain message. Use ✓ Done or ↺ Retry before resuming.'); return;
+        }
+        const idle = await waitForComposerIdle(route, Date.now() + 10 * 60 * 1000);
+        if (!idle || !healthyRoute(route)) return;
+        const oldUser = userMessages().at(-1);
+        const oldAssistant = assistantMessages().at(-1);
+        await queueOp('sending', { id: item.id }, route); render();
+        const clicked = await sendMessage(item.text, route);
+        if (!clicked) {
+          // Never restore to pending automatically: editor text may have been inserted.
+          if (state.running) pause('Send not confirmed. Check ChatGPT and resolve item manually.');
+          return;
+        }
+        setStatus('Checking submitted prompt…');
+        const received = await waitForReceipt(item.text, oldUser, route);
+        if (!received) { pause('Could not confirm sent message. Check ChatGPT before continuing.'); return; }
+        await queueOp('awaiting', { id: item.id }, route); render();
+        setStatus('Waiting for response to finish…');
+        const finished = await waitForResponse(oldAssistant, route);
+        if (!finished) { pause('Response completion uncertain. Verify ChatGPT, then use ✓ Done.'); return; }
+        if (!healthyRoute(route)) return;
+        await queueOp('complete', { id: item.id }, route); render();
+        setStatus('Response complete; continuing queue…');
+      }
+      if (state.running) pause('Queue complete.');
+    } catch (error) { pause('Queue stopped due to an unexpected page or storage error.'); console.warn('[Queued for ChatGPT]', error); }
+  }
+  async function runFirstPromptInNewChat(temporaryRoute) {
+    const first = state.queue[0];
+    if (!first || first.status !== 'pending') {
+      pause('Review the first queued prompt before starting.'); return;
+    }
+    if (!await waitForComposerIdle(temporaryRoute, Date.now() + 10 * 60 * 1000)) return;
+    if (!healthyRoute(temporaryRoute)) return;
+    const previousUser = userMessages().at(-1);
+    const previousAssistant = assistantMessages().at(-1);
+    await queueOp('sending', { id: first.id }, temporaryRoute);
+    newChatHandoff = { from: temporaryRoute, id: first.id, text: first.text,
+      clickedAt: 0, destination: null };
+    const handoff = newChatHandoff;
+    const clicked = await sendMessage(first.text, temporaryRoute);
+    if (!clicked) {
+      if (state.running) pause('First send uncertain. Check the composer before retrying.');
+      return;
+    }
+    setStatus('Creating ChatGPT conversation…');
+    const deadline = Date.now() + 90000;
+    while (state.running && newChatHandoff === handoff && Date.now() < deadline &&
+           !handoff.destination) {
+      if (currentRoute() && location.pathname !== lastPathname) scheduleRouteCheck();
+      await signalOrTimeout(500);
+    }
+    if (!state.running || newChatHandoff !== handoff) return;
+    const stableRoute = handoff.destination;
+    if (!stableRoute || state.route !== stableRoute) {
+      pause('Chat ID was not confirmed. Check the first message and retry only after review.'); return;
+    }
+    // A second tab must not send to the newly created conversation while we verify the first prompt.
+    await navigator.locks.request('qfc-queue-' + stableRoute, { ifAvailable: true }, async lock => {
+      if (!lock) { pause('This new conversation is being controlled by another tab.'); return; }
+      while (state.running && state.routeLoading && Date.now() < deadline) await signalOrTimeout(250);
+      if (!healthyRoute(stableRoute) || !state.storageHealthy || state.routeLoading ||
+          state.queue[0]?.id !== handoff.id || state.queue[0]?.status !== 'sending') {
+        pause('Could not verify queue migration. Review first prompt before resuming.'); return;
+      }
+      setStatus('Checking the first submitted prompt or reply…');
+      const evidence = await waitForFirstTurnEvidence(handoff.text, previousUser, previousAssistant, stableRoute);
+      if (!evidence) {
+        pause('First send could not be confirmed. Check ChatGPT before resuming.'); return;
+      }
+      await queueOp('awaiting', { id: handoff.id }, stableRoute);
+      setStatus(evidence.receipt === 'assistant'
+        ? 'First reply detected; verifying completion…' : 'Waiting for the first response…');
+      if (!await waitForResponse(previousAssistant, stableRoute, evidence.sawStop)) {
+        pause('First response completion uncertain. Use ✓ Done after reviewing.'); return;
+      }
+      if (!healthyRoute(stableRoute)) return;
+      await queueOp('complete', { id: handoff.id }, stableRoute);
+      newChatHandoff = null;
+      setStatus('First response complete; continuing queue…');
+      await runQueue(stableRoute);
+    });
+  }
+  // Clicking a saved workflow is a single explicit Start action: acquire the
+  // conversation's sending lock BEFORE appending the steps, then run the queue.
+  // This avoids adding prompts in a second tab that cannot own the sender lock.
+  function startQueue(workflowId = null) {
+    if (state.running) {
+      if (workflowId) notify('This queue is already running. Pause it before starting a saved workflow.');
+      return;
+    }
+    if (state.routeLoading || !state.storageHealthy) {
+      if (workflowId) notify('The chat queue is not ready. Reload or try again.');
+      return;
+    }
+    if (!workflowId && !state.queue.length) return;
+    const route = state.route;
+    if (!(route?.startsWith('chat:') || (route?.startsWith('new:') && isNewChatPage()))) {
+      notify('Open a ChatGPT conversation or New Chat page before starting.'); return;
+    }
+    const workflow = workflowId ? state.workflows.find(w => w.id === workflowId) : null;
+    if (workflowId && !workflow) { notify('Workflow was changed or deleted. Reopen Workflows.'); return; }
+    if (state.queue.some(item => item.status !== 'pending')) {
+      notify('Review uncertain queued prompts using ✓ Done or ↺ Retry before starting.'); return;
+    }
+    if (workflow && state.queue.length && !confirm(
+      `This chat already has ${state.queue.length} pending prompt(s). Start will send these FIRST, then all ${workflow.steps.length} steps of “${workflow.name}”. Continue?`)) return;
+    if (!navigator.locks?.request) { notify('Web Locks unavailable: auto-send disabled to prevent multiple tabs sending.'); return; }
+    // Detect edits that happened in another tab after the user approved starting.
+    const initialRevision = state.queueRev;
+    state.running = true;
+    setStatus(workflow ? `Preparing workflow “${workflow.name}”…` : 'Starting queue…');
+    navigator.locks.request('qfc-queue-' + route, { ifAvailable: true }, async lock => {
+      if (!lock) { pause('Another tab is controlling this conversation queue.'); return; }
+      try {
+        applyQueue(route, await rpc('getQueue', { route }));
+        if (workflow) {
+          if (state.queueRev !== initialRevision) {
+            pause('Queue changed in another tab. Review before starting this workflow.'); return;
+          }
+          if (state.queue.some(item => item.status !== 'pending')) {
+            pause('An uncertain queued prompt needs review before starting.'); return;
+          }
+          // appendWorkflow is one idempotent, all-or-none coordinator mutation.
+          // A full queue or deleted workflow is rejected BEFORE any prompt sends.
+          const record = await rpc('appendWorkflow', { route, workflowId }, makeOperationId());
+          applyQueue(route, record);
+          if (state.route !== route) {
+            pause('Conversation changed; workflow was saved to the prior chat queue.'); return;
+          }
+          setTab('queue');
+          setStatus(`Workflow “${workflow.name}” started — sending in order…`);
+        }
+        if (!state.queue.length || state.queue[0].status !== 'pending') {
+          pause('Queue has changed. Review the first prompt before resuming.'); return;
+        }
+        if (route.startsWith('new:')) await runFirstPromptInNewChat(route);
+        else await runQueue(route);
+      } catch (error) {
+        pause(workflow ? 'Could not start workflow. Check queue and storage before retrying.' : 'Unable to load current queue.');
+        console.warn('[Queued for ChatGPT]', error);
+      }
+    }).catch(error => { pause('Unable to lock the conversation queue.'); console.warn('[Queued for ChatGPT]', error); });
+  }
+
+  function scheduleRouteCheck() {
+    if (routeTimer) return;
+    routeTimer = setTimeout(() => { routeTimer = null; checkRoute(); }, 250);
+  }
+  function observePage() {
+    pageObserver = new MutationObserver(records => {
+      let touched = false;
+      for (const change of records) {
+        const target = change.target.nodeType === Node.ELEMENT_NODE ? change.target : change.target.parentElement;
+        if (target?.closest?.('#qfc-root')) continue;
+        if (target?.closest?.(ASSISTANT_SELECTOR)) lastAssistantChange = Date.now();
+        if (change.type !== 'childList') { touched = true; continue; }
+        for (const added of change.addedNodes) {
+          if (added.nodeType !== Node.ELEMENT_NODE) continue;
+          if (added.id === 'qfc-root') continue;
+          touched = true;
+        }
+        // Removals can signal the Stop button disappearing or navigation.
+        if (change.removedNodes.length) touched = true;
+      }
+      if (touched) { wake(); if (location.pathname !== lastPathname) scheduleRouteCheck(); }
+    });
+    pageObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+    window.addEventListener('popstate', scheduleRouteCheck);
+    window.addEventListener('hashchange', scheduleRouteCheck);
+    document.addEventListener('click', event => {
+      // Only a real user click; don't confuse the disappearance of Stop after
+      // manual cancellation with successful assistant completion.
+      if (state.running && event.isTrusted && event.target.closest?.(STOP_SELECTORS)) {
+        pause('Response manually stopped. Review the current queued prompt.');
+      }
+      const link = event.target.closest?.('a[href]');
+      if (link) {
+        try {
+          const destination = new URL(link.href);
+          if (destination.origin === location.origin && C.conversationId(destination.pathname) && !currentRoute()) navigateToExistingChat = true;
+        } catch (_) { /* ignore non-URLs */ }
+        scheduleRouteCheck();
+      }
+      if (!currentRoute()) {
+        const editor = findEditor();
+        const send = findSendButton(editor);
+        if (editor && send && (event.target === send || send.contains(event.target)) && C.normalize(editorText(editor))) tempSubmittedAt = Date.now();
+      }
+    }, true);
+    document.addEventListener('keydown', event => {
+      if (currentRoute() || event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+      const editor = findEditor();
+      if (editor && (event.target === editor || editor.contains(event.target)) && C.normalize(editorText(editor))) tempSubmittedAt = Date.now();
+    }, true);
+    window.addEventListener('pagehide', () => pause('Tab closed or navigating away.'));
+  }
+  async function initialize() {
+    initPanel();
+    try {
+      const [record, settings] = await Promise.all([
+        rpc('getWorkflows'), STORAGE.get(C.SETTINGS_KEY)
+      ]);
+      applyWorkflows(record);
+      state.open = Boolean(settings[C.SETTINGS_KEY]?.open);
+    } catch (_) { state.storageHealthy = false; setStatus('Could not load workflows. Reload the tab.'); }
+    checkRoute();
+    render();
+    setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
+    observePage();
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area !== 'local') return;
+      if (changes[C.WORKFLOWS_KEY]) applyWorkflows(changes[C.WORKFLOWS_KEY].newValue);
+      if (state.route && changes[C.queueKey(state.route)]) applyQueue(state.route, changes[C.queueKey(state.route)].newValue);
+    });
+  }
+  if (document.body) initialize();
+  else document.addEventListener('DOMContentLoaded', initialize, { once: true });
+})();

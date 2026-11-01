@@ -1,0 +1,20 @@
+QUEUED FOR CHATGPT — v1.2.0 to v1.2.1
+
+[ ] Export important Saved Workflows as JSON backup.
+[ ] Do not uninstall the existing extension or change its extension ID.
+[ ] Extract v1.2.1 and replace files inside the SAME unpacked directory.
+[ ] chrome://extensions → Reload; verify version 1.2.1 and same ID.
+[ ] Reload every open ChatGPT tab/window.
+[ ] Open Workflows → confirm each saved item now says "▶ Start Workflow".
+[ ] In New Chat, click Start Workflow on a harmless 2-step workflow.
+[ ] Check that step 2 starts after step 1 finishes WITHOUT clicking Queue Start.
+[ ] If the chat already has pending items, confirm they send first (or cancel).
+[ ] Check another tab showing the same chat cannot also begin sending.
+[ ] Verify floating-panel dragging and workflow editing still work.
+
+IMPORTANT:
+- Start Workflow appends all steps and sends immediately, rather than just loading.
+- An existing pending queue sends BEFORE appended workflow steps, after approval.
+- Uncertain messages require review; never blindly retry already sent prompts.
+- Keep one extension copy, with the same ID, to preserve storage.
+- Tested on simulated pages; live Chromebook compatibility still needs testing.
