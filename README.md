@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.1 — One-click Start Workflow
+# Queued for ChatGPT v1.2.2 (main source) — Start or Load Workflows
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
 **[⬇️ Download the latest release (v1.2.1)](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.1)** — ready-to-extract Chrome extension ZIP, release notes, and SHA-256 checksum. No Chrome Web Store account needed.
+
+**New in v1.2.2 source (not yet packaged as a Release):** Each saved workflow now has both **▶ Start Workflow** and **+ Load**. **Load** appends its steps to the end of the current conversation queue without starting a paused queue. If the queue is already running, the new steps run automatically after the existing queued prompts. It does not interrupt, reorder, or restart the active prompt. To try this version, use **Code → Download ZIP** from the `main` branch, not the v1.2.1 Release asset.
 
 **Testing release.** The automated checks use simulated ChatGPT pages. Compatibility with your live ChatGPT account and Chromebook memory consumption are not yet verified.
 
@@ -16,7 +18,7 @@ Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Ins
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list (currently version **1.2.1**).
+7. Check that **Queued for ChatGPT** appears in your extensions list (**1.2.1** for the release ZIP, **1.2.2** for current `main` source).
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -35,7 +37,7 @@ The screenshots below show the **v1.2.1 Queue and Saved Workflows panels**, with
 
 ![Queued for ChatGPT — Saved Workflows with Start Workflow button](screenshots/workflows.png)
 
-## What changed from v1.2.0
+## What changed in the v1.2.1 release from v1.2.0
 
 - **▶ Start Workflow** replaces **+ Load to Queue** on each saved workflow.
 - Clicking once **appends all workflow steps to the current conversation's queue and starts sending immediately**. It no longer requires a second click on the main Queue **Start** button.
@@ -58,6 +60,17 @@ Unpacked extensions **do not update automatically from GitHub**.
 5. Refresh all ChatGPT tabs to load the new content script.
 
 Changing the extension's ID (for example, by installing from a different folder) can make your old locally stored queues and workflows inaccessible to the new copy. Export backups before upgrading, and check uncertain sends manually to avoid duplicates.
+
+## How to use Load Workflow (v1.2.2 source)
+
+1. Open **Workflows** and find the saved workflow you want.
+2. Click **+ Load**. All its steps append after the current queued prompts, preserving their order.
+3. If the queue is **paused or empty**, Load only prepares the queue. Open **Queue** and click **Start** when you want it to send.
+4. If the queue is **already running**, Load does not restart it. The active prompt finishes first, any previously pending prompts run next, and the loaded workflow steps follow automatically.
+
+For example, with prompt **#1 running** and prompt **#2 pending**, loading a two-step workflow adds those steps as **#3** and **#4**. Load may also be used from a second tab for the same conversation: the tab holding the sending lock continues processing the shared queue. A workflow load is all-or-none if the 100-prompt limit would be exceeded.
+
+**Start Workflow** is unchanged: it still appends and immediately starts a stopped queue, and it asks for confirmation when pending prompts already exist. Use Load instead when the queue is already running.
 
 ## How to use Start Workflow
 
@@ -90,11 +103,12 @@ Changing the extension's ID (for example, by installing from a different folder)
 
 ## Automated tests
 
-`node --test tests/*.test.js` — 28 unit/coordinator/background tests.
+`node --test tests/*.test.js` — 29 unit/coordinator/background tests.
 
 Playwright (installed Chromium, simulated page):
 
 - `tests/smoke_workflows.py` — create/edit then directly start a saved workflow in an existing chat.
+- `tests/smoke_workflow_load_during_run.py` — Load while idle does not send; Load while running appends after existing prompts and the active runner processes the new steps.
 - `tests/smoke_workflow_new_chat.py` — directly start workflow on New Chat.
 - `tests/smoke_workflow_direct_start_safety.py` — three safety cases: existing queue approval, lock refusal, uncertain item.
 - `tests/smoke_browser.py`, `tests/smoke_new_chat.py`, `tests/smoke_app_shell.py`, `tests/smoke_draggable_panel.py` — regression scenarios.
