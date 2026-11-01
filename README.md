@@ -4,6 +4,18 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 **Testing release.** The automated checks use simulated ChatGPT pages. Compatibility with your live ChatGPT account and Chromebook memory consumption are not yet verified.
 
+## Screenshots
+
+The screenshots below show the **v1.2.1 Queue and Saved Workflows panels**, with illustrative prompts on a simulated ChatGPT page. They are interface demos, **not captures of a real user conversation or a live ChatGPT session**.
+
+### Queue
+
+![Queued for ChatGPT — Queue panel with pending prompts](screenshots/queue.png)
+
+### Saved Queue Workflows
+
+![Queued for ChatGPT — Saved Workflows with Start Workflow button](screenshots/workflows.png)
+
 ## What changed from v1.2.0
 
 - **▶ Start Workflow** replaces **+ Load to Queue** on each saved workflow.
