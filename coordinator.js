@@ -3,13 +3,19 @@
   'use strict';
   const C = root.QFC || (typeof require !== 'undefined' ? require('./core.js') : null);
   function error(message) { throw new Error(message); }
-  function record(items, rev = 0, ops = []) { return { version: 2, rev, items, ops }; }
+  function record(items, rev = 0, ops = [], lastCompleted = null) {
+    const result = { version: 2, rev, items, ops };
+    const previous = C.cleanLastCompleted(lastCompleted);
+    if (previous) result.lastCompleted = previous;
+    return result;
+  }
   function clean(recordValue, kind) {
     const value = recordValue || {};
     const raw = Array.isArray(value) ? value : value.items;
     const items = kind === 'favorites' ? C.cleanFavorites(raw) : kind === 'workflows' ? C.cleanWorkflows(raw) : C.cleanQueue(raw);
     return record(items, Number.isSafeInteger(value.rev) && value.rev >= 0 ? value.rev : 0,
-      Array.isArray(value.ops) ? value.ops.filter(x => typeof x === 'string').slice(-80) : []);
+      Array.isArray(value.ops) ? value.ops.filter(x => typeof x === 'string').slice(-80) : [],
+      kind === 'queue' ? value.lastCompleted : null);
   }
   function mutateQueue(items, mutation) {
     let next = C.cleanQueue(items);
@@ -20,7 +26,12 @@
         if (!Array.isArray(mutation.steps)) error('Invalid workflow steps.');
         const steps = C.cleanWorkflowSteps(mutation.steps);
         if (next.length + steps.length > C.MAX_QUEUE) error('Not enough room in the queue for the entire workflow (100 prompts maximum).');
-        next.push(...steps.map(C.newQueueItem));
+        const workflow = mutation.workflow;
+        if (workflow && !C.cleanWorkflowOrigin({ id: workflow.id, name: workflow.name,
+          step: 1, total: steps.length })) error('Invalid workflow origin.');
+        next.push(...steps.map((step, index) => C.newQueueItem(step, workflow ? {
+          id: workflow.id, name: workflow.name, step: index + 1, total: steps.length
+        } : null)));
         break;
       }
       case 'add':
@@ -150,7 +161,17 @@
     const items = kind === 'favorites' ? mutateFavorites(current.items, mutation) : kind === 'workflows' ? mutateWorkflows(current.items, mutation) : mutateQueue(current.items, mutation);
     if (kind === 'workflows' && items.reduce((size, w) => size + w.name.length + w.steps.reduce((n, step) => n + step.length, 0), 0) > C.MAX_WORKFLOWS_TOTAL_CHARS)
       error('Saved workflow library exceeds the 750,000-character lightweight storage limit.');
-    return { record: record(items, current.rev + 1, [...current.ops, operationId].slice(-80)), duplicate: false };
+    let lastCompleted = kind === 'queue' ? current.lastCompleted : null;
+    if (kind === 'queue' && ['complete', 'confirm-done'].includes(mutation.type)) {
+      const finished = current.items[0];
+      lastCompleted = C.cleanLastCompleted({
+        id: finished.id, preview: finished.text.trim().slice(0, C.MAX_ACTIVITY_PREVIEW),
+        completedAt: Date.now(),
+        completion: mutation.type === 'complete' ? 'automatic' : 'confirmed',
+        workflow: finished.workflow
+      });
+    }
+    return { record: record(items, current.rev + 1, [...current.ops, operationId].slice(-80), lastCompleted), duplicate: false };
   }
   const api = { record, clean, mutateQueue, mutateFavorites, mutateWorkflows, transact };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

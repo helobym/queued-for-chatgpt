@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.3 (2026-11-01)
+
+- Added a compact Current / Previous activity strip shared by Queue and Workflows views.
+- Retained workflow ID, name and step number on queued prompts, including Load and New Chat transitions.
+- Persisted one bounded last-completed prompt preview per conversation in the existing atomic queue record.
+- Preserved conservative completion confirmation, manual recovery, storage idempotency and multi-tab synchronization.
+- Updated local storage privacy disclosure, upgrade guidance and regression coverage.
+
 ## 1.2.2 (2026-11-01)
 
 - Restored **+ Load** beside **▶ Start Workflow** for saved workflows.

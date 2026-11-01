@@ -61,3 +61,37 @@ test('v1 queue and favorite records cleanly upgrade, uncertain status retained',
   assert.equal(v2.items[0].status, 'sending');
   assert.equal(M.clean({ version: 1, items: [{ text: 'Fav', sources: ['queued', 'sent'] }] }, 'favorites').items.length, 1);
 });
+
+test('completion snapshots only the confirmed queue head and keeps one previous item', () => {
+  let q = M.record([]);
+  q = trans(q, 'queue', op('add', { text: 'First prompt' }));
+  q = trans(q, 'queue', op('add', { text: 'Second prompt' }));
+  const id = q.items[0].id;
+  q = trans(q, 'queue', op('sending', { id }));
+  assert.equal(q.lastCompleted, undefined);
+  q = trans(q, 'queue', op('awaiting', { id }));
+  q = trans(q, 'queue', op('complete', { id }));
+  assert.equal(q.lastCompleted.id, id);
+  assert.equal(q.lastCompleted.preview, 'First prompt');
+  assert.equal(q.lastCompleted.completion, 'automatic');
+  const saved = q.lastCompleted;
+  q = trans(q, 'queue', op('add', { text: 'Third prompt' }));
+  assert.deepEqual(q.lastCompleted, saved);
+  const retryId = q.items[0].id;
+  q = trans(q, 'queue', op('sending', { id: retryId }));
+  q = trans(q, 'queue', op('confirm-retry', { id: retryId, confirmed: true }));
+  assert.deepEqual(q.lastCompleted, saved);
+  q = trans(q, 'queue', op('sending', { id: retryId }));
+  q = trans(q, 'queue', op('confirm-done', { id: retryId, confirmed: true }));
+  assert.equal(q.lastCompleted.id, retryId);
+  assert.equal(q.lastCompleted.completion, 'confirmed');
+  assert.deepEqual(M.clean(JSON.parse(JSON.stringify(q)), 'queue').lastCompleted, q.lastCompleted);
+});
+test('snapshot is not rewritten by duplicate completion operation', () => {
+  let q = M.record([{ id: 'first', text: 'First', status: 'awaiting' }]);
+  const cmd = { type: 'complete', id: 'first' };
+  const first = M.transact(q, 'queue', cmd, 'activity-once-123').record;
+  const replay = M.transact(first, 'queue', cmd, 'activity-once-123');
+  assert.equal(replay.duplicate, true);
+  assert.deepEqual(replay.record.lastCompleted, first.lastCompleted);
+});

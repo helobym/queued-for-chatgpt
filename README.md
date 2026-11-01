@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.2 — Start or Load Workflows
+# Queued for ChatGPT v1.2.3 — Recent Queue Activity
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇️ Download v1.2.2](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2)** — installation ZIP, release notes, and SHA-256 checksum. No Chrome Web Store account required.
+**Source version: v1.2.3** — [download the current repository ZIP](https://github.com/helobym/queued-for-chatgpt/archive/refs/heads/main.zip) for the new Recent Activity feature. The [v1.2.2 release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2) remains the most recent prepackaged installation ZIP until a v1.2.3 release is published.
+
+**New in v1.2.3:** The floating panel shows **Current** (a prompt being prepared, sent, or awaited) and **Previous** (the last confirmed completed prompt) without scrolling through ChatGPT. Saved workflow steps retain their workflow name, ID and step position. Only one short completed-prompt preview is retained per conversation in local browser storage.
 
 **New in v1.2.2:** Each saved workflow now has both **▶ Start Workflow** and **+ Load**. **Load** appends its steps to the end of the current conversation queue without starting a paused queue. If the queue is already running, the new steps run automatically after the existing queued prompts. It does not interrupt, reorder, or restart the active prompt.
 
@@ -12,13 +14,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [latest GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2), expand **Assets**, and download **`queued-for-chatgpt-v1.2.2.zip`**. (Alternatively, use **Code → Download ZIP** on the repository page.)
+1. To install v1.2.3, use **Code → Download ZIP** on the repository page (or the [main branch ZIP](https://github.com/helobym/queued-for-chatgpt/archive/refs/heads/main.zip)). The older [v1.2.2 release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2) is still available as a prepackaged archive.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list (**1.2.2**).
+7. Check that **Queued for ChatGPT** appears in your extensions list (**1.2.3** when using the current source).
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -27,7 +29,7 @@ Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Ins
 
 ## Screenshots
 
-The Queue PNG is a simulated ChatGPT UI capture from v1.2.1 (the Queue panel itself is unchanged in v1.2.2). The Workflows SVG is an **illustrative v1.2.2 panel mockup**, showing the new Load action. Neither image contains a real conversation.
+The Queue PNG is a simulated ChatGPT UI capture from v1.2.1 and predates the v1.2.3 Recent Activity strip. The Workflows SVG is an **illustrative v1.2.2 panel mockup**, showing the new Load action. Neither image contains a real conversation.
 
 ### Queue
 
@@ -36,6 +38,14 @@ The Queue PNG is a simulated ChatGPT UI capture from v1.2.1 (the Queue panel its
 ### Saved Queue Workflows
 
 ![Queued for ChatGPT — Saved Workflows with Start Workflow and Load buttons](screenshots/workflows-v1.2.2.svg)
+
+## What changed in v1.2.3
+
+- Added **Recent activity** beneath Queue / Workflows showing the current in-flight prompt and the last completed prompt.
+- Preserves workflow name, ID and step position on queued steps, including when using Load during another running queue.
+- Stores only one bounded completed-prompt preview per conversation; uncertain sends and retries do not overwrite it.
+- Activity persists across reloads and new-chat migration, with conservative status labels for paused or remotely controlled queues.
+- **Clear** still clears pending prompts, not the last completed preview; uninstalling removes local extension data.
 
 ## What changed in v1.2.2
 
@@ -62,7 +72,7 @@ The Queue PNG is a simulated ChatGPT UI capture from v1.2.1 (the Queue panel its
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download the [latest release ZIP](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2) (or choose **Code → Download ZIP** from the repository) and extract it.
+2. Download the current v1.2.3 source with **Code → Download ZIP** from the repository (the v1.2.2 release ZIP does not contain Recent Activity) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs to load the new content script.
@@ -96,7 +106,7 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 
 - New-chat first prompt, sequential auto-send, pause/resume, edit/remove/reorder, conservative receipt/completion checks, safe manual recovery.
 - Shared workflow library across browser tabs and windows: save pending queue as workflow, create/edit/reorder/delete workflows, JSON import/export.
-- Draggable floating panel, position reset, and per-tab position persistence.
+- Draggable floating panel, position reset, per-tab position persistence and one current/previous prompt activity strip.
 - Old Favorites data remains in legacy storage for separate backup, but the old star/Favorites UI stays removed.
 - Manifest V3, vanilla JS, local-only storage, no API key, no telemetry or external backend.
 
@@ -106,7 +116,7 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 - The extension does **not** treat a temporarily idle composer as proof of a completed response. Missing confirmation leads to a pause, not an automatic retry or duplicate send.
 - If an item is marked sending/awaiting, inspect ChatGPT before using **✓ Done** or **↺ Retry**. Retrying may duplicate a message already sent.
 - A composer draft that ChatGPT hasn't sent won't be overwritten. If an existing draft blocks sending, review it and the queued item before resuming.
-- Queue limit: 100 prompts; workflow limit: 200 named workflows, maximum 100 steps per workflow. Prompt text is stored in local Chrome extension storage and may contain sensitive data.
+- Queue limit: 100 prompts; workflow limit: 200 named workflows, maximum 100 steps per workflow. Prompt text and a single short completed-prompt preview per chat are stored in local Chrome extension storage and may contain sensitive data.
 - Under-25 MB incremental memory remains a target, not a measurement or guarantee.
 
 ## Automated tests

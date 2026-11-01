@@ -7,7 +7,7 @@ Queued for ChatGPT is a browser extension that helps users save prompt workflows
 
 ## What the extension stores
 
-The extension stores queued prompts, saved workflows, queue status, conversation identifiers, and interface preferences in Chrome's local extension storage. It may also keep temporary chat identifiers and the floating panel position in the tab's session storage. Older versions' Favorites data may remain locally for backup.
+The extension stores queued prompts, saved workflows, queue status, conversation identifiers, and interface preferences in Chrome's local extension storage. It also keeps one short preview (up to 160 characters) of the most recently confirmed completed queued prompt per conversation, plus its completion time and workflow origin when available. This is not a full prompt or response history. It may also keep temporary chat identifiers and the floating panel position in the tab's session storage. Older versions' Favorites data may remain locally for backup.
 
 This information stays in your browser profile. **Helobym Networking does not operate a server that receives it.** The extension does not use advertising trackers, analytics, or telemetry.
 
@@ -21,7 +21,7 @@ Prompt content submitted to ChatGPT is processed by OpenAI under its own terms a
 
 The extension does not sell or share your stored prompts with Helobym Networking or third-party advertisers. It sends prompts to ChatGPT only as part of the sending feature you activate.
 
-You can remove queued prompts and saved workflows within the extension. Uninstalling the extension normally removes its local extension storage. If you export workflows or older Favorites as JSON files, those copies remain wherever you saved them until you delete them yourself.
+You can remove queued prompts and saved workflows within the extension. **Clear** removes pending queue items but keeps the most recently completed prompt preview; to remove that saved preview and other local extension data, uninstall the extension (which normally removes its local extension storage). If you export workflows or older Favorites as JSON files, those copies remain wherever you saved them until you delete them yourself.
 
 ## Permissions
 

@@ -12,6 +12,7 @@
   const MAX_WORKFLOW_CHARS = 150000;
   const MAX_WORKFLOWS_TOTAL_CHARS = 750000;
   const MAX_WORKFLOW_NAME = 100;
+  const MAX_ACTIVITY_PREVIEW = 160;
 
   function normalize(text) {
     return String(text ?? '').normalize('NFKC').replace(/\s+/gu, ' ').trim();
@@ -33,18 +34,29 @@
     }
     return 'qfc_v2_queue_' + conversation;
   }
-  function newQueueItem(text) {
+  function newQueueItem(text, workflow = null) {
     if (!validText(text)) throw new Error('Prompt must be 1–20,000 characters.');
-    return { id: id(), text: text.trim(), status: 'pending', createdAt: Date.now() };
+    const item = { id: id(), text: text.trim(), status: 'pending', createdAt: Date.now() };
+    if (workflow) {
+      const origin = cleanWorkflowOrigin(workflow);
+      if (!origin) throw new Error('Invalid workflow origin.');
+      item.workflow = origin;
+    }
+    return item;
   }
   function cleanQueue(items) {
     if (!Array.isArray(items)) return [];
-    return items.slice(0, MAX_QUEUE).filter(item => item && validText(item.text)).map(item => ({
-      id: typeof item.id === 'string' && item.id.length <= 100 ? item.id : id(),
-      text: item.text,
-      status: ['pending', 'sending', 'awaiting'].includes(item.status) ? item.status : 'pending',
-      createdAt: Number.isFinite(item.createdAt) ? item.createdAt : Date.now()
-    }));
+    return items.slice(0, MAX_QUEUE).filter(item => item && validText(item.text)).map(item => {
+      const clean = {
+        id: typeof item.id === 'string' && item.id.length <= 100 ? item.id : id(),
+        text: item.text,
+        status: ['pending', 'sending', 'awaiting'].includes(item.status) ? item.status : 'pending',
+        createdAt: Number.isFinite(item.createdAt) ? item.createdAt : Date.now()
+      };
+      const origin = cleanWorkflowOrigin(item.workflow);
+      if (origin) clean.workflow = origin;
+      return clean;
+    });
   }
   function cleanFavorites(items) {
     if (!Array.isArray(items)) return [];
@@ -108,6 +120,28 @@
   function validWorkflowName(name) {
     return typeof name === 'string' && normalize(name).length > 0 && name.trim().length <= MAX_WORKFLOW_NAME;
   }
+  function cleanWorkflowOrigin(value) {
+    if (!value || typeof value !== 'object' ||
+        typeof value.id !== 'string' || !value.id || value.id.length > 100 ||
+        !validWorkflowName(value.name) ||
+        !Number.isInteger(value.step) || !Number.isInteger(value.total) ||
+        value.step < 1 || value.total > MAX_QUEUE || value.step > value.total) return null;
+    return { id: value.id, name: value.name.trim(), step: value.step, total: value.total };
+  }
+  function cleanLastCompleted(value) {
+    if (!value || typeof value !== 'object' ||
+        typeof value.id !== 'string' || !value.id || value.id.length > 100 ||
+        !validText(value.preview) ||
+        !Number.isFinite(value.completedAt) || value.completedAt < 0 ||
+        !['automatic', 'confirmed'].includes(value.completion)) return null;
+    const clean = {
+      id: value.id, preview: value.preview.slice(0, MAX_ACTIVITY_PREVIEW),
+      completedAt: value.completedAt, completion: value.completion
+    };
+    const workflow = cleanWorkflowOrigin(value.workflow);
+    if (workflow) clean.workflow = workflow;
+    return clean;
+  }
   function cleanWorkflowSteps(steps) {
     if (!Array.isArray(steps) || steps.length < 1 || steps.length > MAX_QUEUE ||
         !steps.every(validText)) throw new Error('Workflows need 1–100 nonempty prompts, up to 20,000 characters each.');
@@ -137,7 +171,8 @@
     return result;
   }
   const api = { VERSION, MAX_PROMPT_LENGTH, MAX_FAVORITES, MAX_QUEUE, FAV_KEY, SETTINGS_KEY,
-    WORKFLOWS_KEY, MAX_WORKFLOWS, MAX_WORKFLOW_CHARS, MAX_WORKFLOWS_TOTAL_CHARS, validWorkflowName, cleanWorkflowSteps, cleanWorkflows,
+    WORKFLOWS_KEY, MAX_WORKFLOWS, MAX_WORKFLOW_CHARS, MAX_WORKFLOWS_TOTAL_CHARS, MAX_ACTIVITY_PREVIEW,
+    validWorkflowName, cleanWorkflowSteps, cleanWorkflows, cleanWorkflowOrigin, cleanLastCompleted,
     normalize, validText, conversationId, queueKey, newQueueItem, cleanQueue,
     cleanFavorites, toggleFavorite, upsertFavorite, importFavorites };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

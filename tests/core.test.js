@@ -49,3 +49,18 @@ test('import retains both provenance labels', () => {
   ]}, []);
   assert.deepEqual(result.favorites[0].sources, ['queued', 'sent']);
 });
+
+test('workflow origin and recent activity data are validated and survive cleaning', () => {
+  const workflow = { id: 'flow-1', name: 'Research', step: 2, total: 3 };
+  const item = core.newQueueItem('Second prompt', workflow);
+  assert.deepEqual(core.cleanQueue([item])[0].workflow, workflow);
+  assert.equal(core.cleanQueue([{ ...item, workflow: { ...workflow, step: 4 } }])[0].workflow, undefined);
+  assert.throws(() => core.newQueueItem('Prompt', { ...workflow, step: 0 }), /Invalid workflow/);
+  const snapshot = core.cleanLastCompleted({
+    id: item.id, preview: 'x'.repeat(250), completedAt: 123,
+    completion: 'automatic', workflow
+  });
+  assert.equal(snapshot.preview.length, core.MAX_ACTIVITY_PREVIEW);
+  assert.deepEqual(snapshot.workflow, workflow);
+  assert.equal(core.cleanLastCompleted({ ...snapshot, completion: 'unconfirmed' }), null);
+});

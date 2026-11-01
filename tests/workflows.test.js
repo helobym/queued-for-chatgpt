@@ -127,3 +127,23 @@ test('workflows enforce per-workflow and aggregate lightweight storage limits',(
   })), 1, []);
   assert.throws(()=>M.transact(stored,'workflows',{type:'create',name:'Extra',steps:['x'.repeat(10000)]},rid()),/750,000/);
 });
+
+test('loaded workflow steps preserve origin and last-completed attribution', async () => {
+  const w = worker();
+  const created = await ok(w.send({ command: 'workflows', operationId: rid(),
+    mutation: { type: 'create', name: 'Research', steps: ['Research one', 'Research two'] } }));
+  const flow = created.items[0];
+  let q = await ok(w.send({ command: 'appendWorkflow', route: 'chat:abc',
+    workflowId: flow.id, operationId: rid() }));
+  assert.deepEqual(Array.from(q.items.map(item => item.workflow.step)), [1, 2]);
+  assert.equal(q.items[0].workflow.id, flow.id);
+  assert.equal(q.items[1].workflow.name, 'Research');
+  q = await ok(w.send({ command: 'queue', route: 'chat:abc', operationId: rid(),
+    mutation: { type: 'sending', id: q.items[0].id } }));
+  q = await ok(w.send({ command: 'queue', route: 'chat:abc', operationId: rid(),
+    mutation: { type: 'awaiting', id: q.items[0].id } }));
+  q = await ok(w.send({ command: 'queue', route: 'chat:abc', operationId: rid(),
+    mutation: { type: 'complete', id: q.items[0].id } }));
+  assert.equal(q.lastCompleted.workflow.step, 1);
+  assert.equal(q.items[0].workflow.step, 2);
+});

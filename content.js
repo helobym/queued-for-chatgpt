@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.2 — start or append saved workflows safely. */
+/* Queued for ChatGPT v1.2.3 — lightweight recent queue activity. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -34,7 +34,7 @@
   const TEMP_SESSION_KEY = 'qfc_v1_temporary_conversation';
   const PANEL_POSITION_KEY = 'qfc_panel_position_v1';
   const state = {
-    route: null, queue: [], workflows: [], tab: 'queue', open: false,
+    route: null, queue: [], lastCompleted: null, workflows: [], tab: 'queue', open: false,
     editingQueueId: null, workflowDraft: null,
     running: false, status: 'Paused', waiting: false, queueRev: -1, workflowsRev: -1,
     routeLoading: false, storageHealthy: true
@@ -67,6 +67,7 @@
   function setStatus(message) {
     state.status = message;
     renderHeader();
+    renderActivity();
   }
   function notify(message) { setStatus(message); }
   function currentRoute() { return C.conversationId(location.pathname); }
@@ -104,6 +105,7 @@
     if (route !== state.route || !record || record.rev < state.queueRev) return;
     state.queueRev = record.rev;
     state.queue = C.cleanQueue(record.items);
+    state.lastCompleted = C.cleanLastCompleted(record.lastCompleted);
     render(); wake();
   }
   function applyWorkflows(record) {
@@ -221,7 +223,8 @@
     if (state.running && !expectedHandoff) pause('Conversation changed — queue paused.');
     if (expectedHandoff) newChatHandoff.destination = stable;
     state.route = route;
-    state.queue = []; state.queueRev = -1;
+    state.queue = []; state.queueRev = -1; state.lastCompleted = null;
+    render();
     setStatus(expectedHandoff ? 'New chat created — verifying first prompt…' :
       migrateFrom ? 'New chat saved — review queue before resuming.' : 'Paused');
     loadRoute(route, { migrateFrom });
@@ -264,6 +267,17 @@
           <button type="button" data-action="tab-queue" class="qfc-active">Queue <span id="qfc-count">0</span></button>
           <button type="button" data-action="tab-workflows">☷ Workflows <span id="qfc-workflow-count">0</span></button>
         </nav>
+        <section id="qfc-activity" class="qfc-activity" aria-label="Recent queue activity" hidden>
+          <div class="qfc-activity-heading">Recent activity <span>Latest only</span></div>
+          <div id="qfc-activity-current" class="qfc-activity-entry" hidden>
+            <div class="qfc-activity-top"><strong class="qfc-activity-label"></strong><span class="qfc-activity-state"></span></div>
+            <div class="qfc-activity-preview"></div><div class="qfc-activity-origin"></div>
+          </div>
+          <div id="qfc-activity-previous" class="qfc-activity-entry" hidden>
+            <div class="qfc-activity-top"><strong class="qfc-activity-label"></strong><span class="qfc-activity-state"></span></div>
+            <div class="qfc-activity-preview"></div><div class="qfc-activity-origin"></div>
+          </div>
+        </section>
         <div id="qfc-queue-view" class="qfc-view">
           <label class="qfc-label" for="qfc-compose">Next prompt</label>
           <textarea id="qfc-compose" rows="3" maxlength="20000" placeholder="Write a prompt to queue…"></textarea>
@@ -441,6 +455,42 @@
         : 'Open New Chat to start a queue.'
       : state.status;
   }
+  function renderActivity() {
+    if (!root) return;
+    const section = root.querySelector('#qfc-activity');
+    const head = state.queue[0];
+    // Only identify a current prompt when it has started sending, or this tab
+    // is preparing the first pending item. Do not label idle queued work as running.
+    const current = head && (head.status !== 'pending' || state.running) ? head : null;
+    const previous = state.lastCompleted;
+    const wasHidden = section.hidden;
+    section.hidden = !current && !previous;
+    function populate(id, item, label, status) {
+      const element = root.querySelector(id);
+      element.hidden = !item;
+      if (!item) return;
+      element.querySelector('.qfc-activity-label').textContent = label;
+      element.querySelector('.qfc-activity-state').textContent = status;
+      const preview = element.querySelector('.qfc-activity-preview');
+      preview.textContent = item.text || item.preview;
+      preview.title = item.text || item.preview;
+      const origin = element.querySelector('.qfc-activity-origin');
+      const workflow = item.workflow;
+      origin.textContent = workflow
+        ? `${workflow.name} · Step ${workflow.step}/${workflow.total} · ID ${workflow.id.slice(0, 8)}…`
+        : 'Queue prompt';
+      origin.title = workflow ? `Workflow ID: ${workflow.id}` : 'Queued prompt (workflow origin unavailable)';
+    }
+    const currentStatus = !current ? '' : current.status === 'pending' ? 'Preparing' :
+      !state.running ? 'Needs review' :
+      current.status === 'sending' ? 'Sending' : 'Awaiting response';
+    populate('#qfc-activity-current', current, 'Current', currentStatus);
+    populate('#qfc-activity-previous', previous, 'Previous',
+      previous?.completion === 'confirmed' ? 'Confirmed done' : 'Completed');
+    if (state.open && wasHidden !== section.hidden) {
+      setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
+    }
+  }
   function renderQueue() {
     if (!queueList) return;
     const frag = document.createDocumentFragment();
@@ -524,7 +574,7 @@
     renderWorkflowEditor();
     root.querySelector('#qfc-edit-workflow-name').focus();
   }
-  function render() { renderHeader(); renderQueue(); renderWorkflows(); }
+  function render() { renderHeader(); renderActivity(); renderQueue(); renderWorkflows(); }
   async function addPrompt(text) {
     if (!C.validText(text)) { notify('Enter a prompt (up to 20,000 characters).'); return false; }
     try { await queueOp('add', { text }); render(); return true; }

@@ -56,6 +56,8 @@ try:
         page.locator('#qfc-queue-items').get_by_text('Second prompt is queued in that conversation').wait_for()
         page.wait_for_function('''() => document.querySelector('#qfc-status').textContent.includes('Queue complete')''', timeout=30000)
         assert page.locator('#qfc-count').inner_text() == '0'
+        activity = page.locator('#qfc-activity-previous').inner_text()
+        assert 'Second prompt is queued' in activity and 'Step 2/2' in activity, activity
         assert page.locator('[data-message-author-role="user"]').count() == 2
         assert page.evaluate("QFC.conversationId(location.pathname)") == 'chat:created-new-chat'
         print('PASS: saved workflow loads on New Chat and automatically sends both prompts')

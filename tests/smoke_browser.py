@@ -42,6 +42,8 @@ try:
         page.locator('#qfc-start').click()
         page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Queue complete')", timeout=25000)
         assert page.locator('#qfc-count').inner_text() == '0'
+        assert page.locator('#qfc-activity-current').is_hidden()
+        assert 'Second queued prompt' in page.locator('#qfc-activity-previous').inner_text()
         assert page.locator('[data-message-author-role="user"]').count() == 3
         print('PASS: queue auto-sends two prompts after saving multi-step workflow')
         browser.close()

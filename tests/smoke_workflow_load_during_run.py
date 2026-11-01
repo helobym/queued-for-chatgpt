@@ -72,5 +72,8 @@ with sync_playwright() as p:
     sent = page.locator('[data-message-author-role="user"] .whitespace-pre-wrap').all_inner_texts()
     assert sent[-4:] == ['Existing first', 'Existing second', 'Workflow first', 'Workflow second'], sent
     assert page.locator('#qfc-count').inner_text() == '0'
+    assert page.locator('#qfc-activity-current').is_hidden()
+    previous = page.locator('#qfc-activity-previous').inner_text()
+    assert 'Workflow second' in previous and 'Step 2/2' in previous, previous
     print('PASS: Load is passive when idle and active runner sends appended workflow in order')
     browser.close()

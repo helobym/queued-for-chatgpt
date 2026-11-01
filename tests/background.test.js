@@ -73,3 +73,22 @@ test('unsafe origin cannot invoke coordinator', async () => {
   const bg = createWorker();
   assert.equal(bg.forbidden({command:'getFavorites'}), false);
 });
+
+test('temporary chat migration preserves workflow origin and completed preview', async () => {
+  const origin = { id: 'flow-1', name: 'Research', step: 1, total: 2 };
+  const preview = { id: 'prior', preview: 'Prior completed prompt',
+    completedAt: 1000, completion: 'automatic', workflow: origin };
+  const bg = createWorker({
+    'qfc_v2_queue_new:tmp123': { version: 2, rev: 4, ops: [],
+      items: [{ id: 'next', text: 'Next prompt', status: 'pending', workflow: origin }],
+      lastCompleted: preview }
+  });
+  const cmd = { command: 'moveTemp', source: 'new:tmp123', destination: 'chat:mychat',
+    operationId: nextId() };
+  const first = await bg.message(cmd);
+  const retry = await bg.message(cmd);
+  assert.ok(first.ok && retry.ok);
+  assert.equal(retry.data.items[0].workflow.id, origin.id);
+  assert.equal(retry.data.lastCompleted.preview, preview.preview);
+  assert.equal((await bg.message({ command: 'getQueue', route: 'chat:mychat' })).data.lastCompleted.workflow.step, 1);
+});

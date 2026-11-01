@@ -50,7 +50,10 @@ async function moveTemp(source, destination, operationId) {
   const additions = from.items.filter(q => !existing.has(q.id));
   if (to.items.length + additions.length > C.MAX_QUEUE) throw new Error('Target queue is full; temporary prompts were not moved.');
   // Write destination FIRST. If the worker stops between writes, replay deduplicates by ID.
-  const merged = M.record([...to.items, ...additions], to.rev + 1, [...to.ops, operationId].slice(-80));
+  const lastCompleted = [to.lastCompleted, from.lastCompleted]
+    .filter(Boolean).sort((a, b) => b.completedAt - a.completedAt)[0] || null;
+  const merged = M.record([...to.items, ...additions], to.rev + 1,
+    [...to.ops, operationId].slice(-80), lastCompleted);
   await chrome.storage.local.set({ [C.queueKey(destination)]: merged });
   await chrome.storage.local.set({ [C.queueKey(source)]: M.record([], from.rev + 1, [...from.ops, operationId].slice(-80)) });
   return merged;
@@ -71,7 +74,8 @@ async function appendWorkflow(route, workflowId, operationId) {
   const rec = await load('workflows');
   const workflow = rec.items.find(w => w.id === workflowId);
   if (!workflow) throw new Error('Workflow no longer exists. Reload the list.');
-  return mutate('queue', route, operationId, {type: 'addMany', steps: workflow.steps});
+  return mutate('queue', route, operationId, {type: 'addMany', steps: workflow.steps,
+    workflow: {id: workflow.id, name: workflow.name}});
 }
 async function exportLegacyFavorites() {
   const stored = await chrome.storage.local.get([C.FAV_KEY, V1_FAVORITES]);

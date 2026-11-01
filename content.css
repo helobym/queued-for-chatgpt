@@ -23,6 +23,15 @@
 #qfc-root .qfc-nav button { flex: 1; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 2px; }
 #qfc-root .qfc-nav button.qfc-active { font-weight: 700; border-bottom-color: #116b4d; }
 #qfc-root .qfc-view { padding: 10px 11px 0; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
+#qfc-root .qfc-activity { flex-shrink: 0; padding: 7px 12px; border-bottom: 1px solid #e1e8e3; background: #f6f9f7; }
+#qfc-root .qfc-activity-heading { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: #50685a; margin-bottom: 3px; }
+#qfc-root .qfc-activity-heading span { font-weight: 400; }
+#qfc-root .qfc-activity-entry { min-width: 0; padding: 4px 0; }
+#qfc-root .qfc-activity-entry + .qfc-activity-entry:not([hidden]) { border-top: 1px solid #e1e8e3; }
+#qfc-root .qfc-activity-top { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
+#qfc-root .qfc-activity-state { color: #607168; white-space: nowrap; }
+#qfc-root .qfc-activity-preview { font-size: 12px; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+#qfc-root .qfc-activity-origin { font-size: 10px; color: #607168; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #qfc-root .qfc-label { display: block; font-size: 12px; font-weight: 600; margin: 0 0 4px; }
 #qfc-root textarea, #qfc-root input[type="search"], #qfc-root input[type="text"] { background: #fff; border: 1px solid #adbbb4; border-radius: 7px; color: #182c20; width: 100%; padding: 8px; resize: vertical; min-height: 38px; }
 #qfc-root .qfc-row { display: flex; gap: 5px; align-items: center; margin: 6px 0; }
@@ -56,6 +65,13 @@
   #qfc-root textarea, #qfc-root input[type="search"], #qfc-root input[type="text"] { background: #17231c; border-color: #5d7063; color: #f1f6f3; }
   #qfc-root .qfc-head, #qfc-root .qfc-nav, #qfc-root .qfc-item, #qfc-root .qfc-controls, #qfc-root .qfc-backup, #qfc-root .qfc-step, #qfc-root .qfc-workflow-save { border-color: #3b4b40; }
   #qfc-root #qfc-status, #qfc-root #qfc-workflow-editor { background: #2a3a30; color: #d6e6da; border-color: #3b4b40; }
+  #qfc-root .qfc-activity { background: #25372b; border-color: #3b4b40; }
+  #qfc-root .qfc-activity-entry + .qfc-activity-entry:not([hidden]) { border-color: #3b4b40; }
+  #qfc-root .qfc-activity-heading, #qfc-root .qfc-activity-state, #qfc-root .qfc-activity-origin { color: #b6c7ba; }
   #qfc-root .qfc-head small, #qfc-root .qfc-meta, #qfc-root .qfc-empty { color: #b6c7ba; }
 }
 @media (max-width: 480px) { #qfc-root { right: 8px; bottom: 70px; } }
+@media (max-height: 560px) {
+  #qfc-root .qfc-activity { padding-top: 4px; padding-bottom: 4px; }
+  #qfc-root .qfc-activity-preview { -webkit-line-clamp: 1; }
+}
