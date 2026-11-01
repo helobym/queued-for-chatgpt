@@ -13,7 +13,7 @@ This information stays in your browser profile. **Helobym Networking does not op
 
 ## When prompts are sent
 
-When you click **Start** or **Start Workflow**, the extension submits your selected prompts to ChatGPT through the ChatGPT website. It also reads relevant ChatGPT page elements to check whether messages were sent and responses have finished.
+When you click **Start** or **Start Workflow**, the extension submits your selected prompts to ChatGPT through the ChatGPT website. The **+ Load** button only appends prompts to the local queue and does not start a stopped queue; if that queue is already running, its existing sender will eventually submit the newly loaded prompts automatically. It also reads relevant ChatGPT page elements to check whether messages were sent and responses have finished.
 
 Prompt content submitted to ChatGPT is processed by OpenAI under its own terms and privacy policy. Helobym Networking does not control how OpenAI processes that content.
 
