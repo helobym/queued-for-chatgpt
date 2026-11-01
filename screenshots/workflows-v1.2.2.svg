@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1060" height="690" viewBox="0 0 1060 690" role="img" aria-label="Queued for ChatGPT v1.2.2 Workflows panel showing Start Workflow and Load buttons">
+<defs>
+  <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#f7f9f8"/><stop offset="1" stop-color="#e7ede9"/></linearGradient>
+  <filter id="shadow" x="-30%" y="-30%" width="170%" height="170%"><feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#173426" flood-opacity=".22"/></filter>
+</defs>
+<rect width="1060" height="690" fill="url(#bg)"/>
+<rect x="56" y="56" width="572" height="580" rx="19" fill="#fff" stroke="#e3e8e4"/>
+<text x="91" y="115" fill="#263c31" font-family="Arial,sans-serif" font-size="23" font-weight="700">ChatGPT</text>
+<line x1="86" y1="143" x2="598" y2="143" stroke="#e9eeeb"/>
+<rect x="92" y="188" width="386" height="70" rx="16" fill="#edf2ef"/>
+<text x="114" y="215" fill="#395044" font-family="Arial,sans-serif" font-size="16">Illustrative chat context</text>
+<text x="114" y="238" fill="#64756d" font-family="Arial,sans-serif" font-size="14">Workflow demonstration — no real user data</text>
+<rect x="92" y="288" width="460" height="126" rx="14" fill="#f7f9f7"/>
+<rect x="116" y="319" width="308" height="10" rx="5" fill="#dde5df"/>
+<rect x="116" y="344" width="379" height="10" rx="5" fill="#e4eae6"/>
+<rect x="116" y="369" width="263" height="10" rx="5" fill="#e4eae6"/>
+<rect x="91" y="536" width="505" height="64" rx="22" fill="#fff" stroke="#cfdad2" stroke-width="2"/>
+<text x="120" y="576" fill="#8a9990" font-family="Arial,sans-serif" font-size="16">Ask anything...</text>
+<g filter="url(#shadow)">
+<rect x="515" y="75" width="490" height="560" rx="18" fill="#ffffff" stroke="#c5d9ca" stroke-width="2"/>
+</g>
+<rect x="515" y="75" width="490" height="67" rx="18" fill="#1f5840"/>
+<path d="M515 124 V143 H1005 V124" fill="#1f5840"/>
+<text x="539" y="116" fill="#ffffff" font-size="22" font-weight="700" font-family="Arial,sans-serif">☷ Queued for ChatGPT</text>
+<text x="974" y="117" font-size="23" fill="#ffffff" text-anchor="end" font-family="Arial,sans-serif">×</text>
+<rect x="539" y="157" width="144" height="42" rx="10" fill="#e8efeb" stroke="#d0dcd2"/>
+<text x="559" y="183" font-size="16" fill="#365243" font-family="Arial,sans-serif" font-weight="600">Queue  2</text>
+<rect x="693" y="157" width="152" height="42" rx="10" fill="#1f6746"/>
+<text x="715" y="183" font-size="16" fill="#ffffff" font-family="Arial,sans-serif" font-weight="700">Workflows  1</text>
+<text x="540" y="233" font-size="15" fill="#3c5946" font-family="Arial,sans-serif" font-weight="700">Saved queue workflows</text>
+<rect x="538" y="247" width="440" height="39" rx="8" fill="#fff" stroke="#c5d5c9"/>
+<text x="554" y="272" fill="#8b9d92" font-size="15" font-family="Arial,sans-serif">Search workflows…</text>
+<rect x="539" y="303" width="177" height="35" rx="7" fill="#eef6f0" stroke="#c3ddcb"/>
+<text x="555" y="325" font-size="14" fill="#256146" font-family="Arial,sans-serif" font-weight="700">+ Create workflow</text>
+<rect x="538" y="355" width="440" height="193" rx="11" fill="#f8fbf9" stroke="#d4e4d9"/>
+<text x="556" y="383" fill="#1d4230" font-size="19" font-family="Arial,sans-serif" font-weight="700">Research &amp; summary</text>
+<text x="557" y="406" fill="#708275" font-size="13" font-family="Arial,sans-serif">2 steps</text>
+<rect x="556" y="419" width="404" height="52" rx="7" fill="#edf3ef"/>
+<text x="571" y="440" fill="#536b5a" font-size="14" font-family="Arial,sans-serif">1. Research the subject</text>
+<text x="571" y="459" fill="#536b5a" font-size="14" font-family="Arial,sans-serif">2. Summarize the findings</text>
+<rect x="556" y="483" width="173" height="39" rx="8" fill="#266b49"/>
+<text x="571" y="507" fill="#ffffff" font-size="14" font-family="Arial,sans-serif" font-weight="700">▶ Start Workflow</text>
+<rect x="739" y="483" width="84" height="39" rx="8" fill="#eff7f1" stroke="#a8cab2"/>
+<text x="758" y="508" fill="#1f6746" font-size="15" font-family="Arial,sans-serif" font-weight="700">+ Load</text>
+<rect x="833" y="483" width="58" height="39" rx="8" fill="#f1f4f2" stroke="#d5dfd8"/>
+<text x="849" y="508" fill="#48604f" font-size="14" font-family="Arial,sans-serif">Edit</text>
+<rect x="900" y="483" width="61" height="39" rx="8" fill="#f1f4f2" stroke="#d5dfd8"/>
+<text x="908" y="508" fill="#48604f" font-size="14" font-family="Arial,sans-serif">Delete</text>
+<line x1="538" y1="564" x2="978" y2="564" stroke="#e0eae3"/>
+<text x="540" y="590" font-size="14" fill="#52745e" font-family="Arial,sans-serif">Load appends prompts — it never starts a stopped queue.</text>
+<text x="540" y="612" font-size="12" fill="#7d9884" font-family="Arial,sans-serif">Queued for ChatGPT v1.2.2 · illustrative interface mockup</text>
+</svg>
