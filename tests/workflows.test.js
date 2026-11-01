@@ -58,6 +58,30 @@ test('load workflow into another chat is atomic and idempotent under retries',as
   const rec=await ok(w.send({command:'getQueue',route:'chat:other'}));
   assert.deepEqual(Array.from(rec.items.map(q=>q.text)), ['One','Two']);
 });
+test('loading during an active queue appends after existing prompts and preserves the in-flight item',async()=>{
+  const w=worker();
+  const workflows=await ok(w.send({command:'workflows',operationId:rid(),
+    mutation:{type:'create',name:'Next steps',steps:['Workflow one','Workflow two']}}));
+  let queue=await ok(w.send({command:'queue',route:'chat:abc',operationId:rid(),
+    mutation:{type:'add',text:'Running first'}}));
+  const firstId=queue.items[0].id;
+  await ok(w.send({command:'queue',route:'chat:abc',operationId:rid(),
+    mutation:{type:'add',text:'Pending second'}}));
+  await ok(w.send({command:'queue',route:'chat:abc',operationId:rid(),
+    mutation:{type:'sending',id:firstId}}));
+  await ok(w.send({command:'queue',route:'chat:abc',operationId:rid(),
+    mutation:{type:'awaiting',id:firstId}}));
+  queue=await ok(w.send({command:'appendWorkflow',route:'chat:abc',
+    workflowId:workflows.items[0].id,operationId:rid()}));
+  assert.deepEqual(Array.from(queue.items.map(item=>item.text)),
+    ['Running first','Pending second','Workflow one','Workflow two']);
+  assert.equal(queue.items[0].status,'awaiting');
+  assert.ok(queue.items.slice(1).every(item=>item.status==='pending'));
+  queue=await ok(w.send({command:'queue',route:'chat:abc',operationId:rid(),
+    mutation:{type:'complete',id:firstId}}));
+  assert.deepEqual(Array.from(queue.items.map(item=>item.text)),
+    ['Pending second','Workflow one','Workflow two']);
+});
 test('atomic workflow append rejects overflow without partial changes',async()=>{
   const w=worker();
   const created=await ok(w.send({command:'workflows',operationId:rid(),mutation:{type:'create',name:'Two',steps:['One','Two']}}));
