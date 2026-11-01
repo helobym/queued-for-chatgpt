@@ -1,4 +1,4 @@
-"""Simulated browser checks for v1.2.1 one-click Start Workflow safeguards."""
+"""Simulated browser checks for v1.2.2 Start Workflow safeguards."""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
