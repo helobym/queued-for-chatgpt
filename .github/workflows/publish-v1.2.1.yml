@@ -1,0 +1,97 @@
+name: Publish v1.2.1 GitHub Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v1.2.1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout v1.2.1 source
+        uses: actions/checkout@v4
+
+      - name: Create unpacked-extension ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import zipfile
+
+          root = pathlib.Path('.')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+          assert manifest['version'] == '1.2.1', 'This workflow only publishes v1.2.1'
+          required = [
+              'manifest.json', 'background.js', 'content.js', 'content.css',
+              'core.js', 'coordinator.js', 'LICENSE', 'NOTICE.txt',
+              'PRIVACY.md', 'README.md'
+          ]
+          required += [str(f) for f in sorted((root / 'icons').glob('*.png'))]
+          assert len(required) >= 13, 'Extension icons are missing'
+          archive = pathlib.Path('queued-for-chatgpt-v1.2.1.zip')
+          with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as zipped:
+              for name in required:
+                  file = root / name
+                  assert file.is_file(), f'Missing {name}'
+                  zipped.write(file, arcname=name)
+          with zipfile.ZipFile(archive) as zipped:
+              assert zipped.testzip() is None, 'Corrupt ZIP'
+              assert 'manifest.json' in zipped.namelist(), 'Manifest must be at ZIP root'
+          checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+          pathlib.Path('queued-for-chatgpt-v1.2.1.zip.sha256').write_text(
+              f'{checksum}  {archive.name}\n', encoding='utf-8')
+          print(f'Packaged {archive} ({archive.stat().st_size} bytes); SHA256 {checksum}')
+          PY
+
+      - name: Publish v1.2.1 with installation package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/qfc-release-notes.md <<'NOTES'
+          ## Queued for ChatGPT v1.2.1
+
+          **Unofficial, lightweight Chrome / Chromebook extension** to queue ChatGPT prompts and run reusable multi-step workflows.
+
+          ### Highlights
+          - One-click **Start Workflow** queues and starts all workflow steps in order.
+          - Queue editing, pausing and conservative response-completion checks.
+          - Draggable floating panel and multi-tab conversation coordination.
+          - Saved Queue Workflows with editing, import and export.
+          - Local-only extension storage; no developer-operated telemetry or backend.
+          - MIT license under Helobym Networking (Malaysia).
+
+          ### Install from this release
+          1. Download **queued-for-chatgpt-v1.2.1.zip** from the Assets section.
+          2. Extract it into a permanent folder. The `manifest.json` file must be directly inside the folder you select.
+          3. Open **chrome://extensions** in Chrome and enable **Developer mode**.
+          4. Click **Load unpacked** and select the extracted folder containing `manifest.json`.
+          5. Open or refresh **https://chatgpt.com/** and click the floating **☷ Queue** button.
+
+          **Upgrading?** Keep the same unpacked folder and extension ID, replace its extension files, then click **Reload** on the existing extension card. Don't uninstall the old copy, or you may lose access to its local data. Export workflow backups first.
+
+          ### Testing and limitations
+          JavaScript tests and simulated Chromium page tests passed. Real-account ChatGPT compatibility and Chromebook memory use have **not** been independently verified; begin with harmless test prompts.
+
+          Source and documentation: [README](https://github.com/helobym/queued-for-chatgpt#readme) · [Privacy](https://github.com/helobym/queued-for-chatgpt/blob/main/PRIVACY.md) · [MIT License](https://github.com/helobym/queued-for-chatgpt/blob/main/LICENSE)
+          NOTES
+          if gh release view v1.2.1 >/dev/null 2>&1; then
+            gh release upload v1.2.1 queued-for-chatgpt-v1.2.1.zip queued-for-chatgpt-v1.2.1.zip.sha256 --clobber
+          else
+            gh release create v1.2.1 queued-for-chatgpt-v1.2.1.zip queued-for-chatgpt-v1.2.1.zip.sha256 \
+              --title 'Queued for ChatGPT v1.2.1' \
+              --notes-file /tmp/qfc-release-notes.md \
+              --target "$GITHUB_SHA" \
+              --latest
+          fi
