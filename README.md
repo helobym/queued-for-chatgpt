@@ -71,4 +71,4 @@ No live-site or Chromebook memory test was possible here. Begin with two harmles
 
 ## License and ownership
 
-Independently developed; no Superpower for ChatGPT code or assets were reused. The project is unofficial and not affiliated with or endorsed by OpenAI or Superpower. A redistribution license has not been selected.
+Copyright (c) 2026 **Helobym Networking (Malaysia)**. **All rights reserved.** See [LICENSE](LICENSE) for proprietary copyright and permission terms. This is **not an open-source license**; copying, modification, and redistribution require authorization. Independently developed; no Superpower for ChatGPT code or assets were reused. The project is unofficial and not affiliated with or endorsed by OpenAI or Superpower. Before public distribution, confirm the correct registered legal rightsholder and any needed author/contributor rights assignments.

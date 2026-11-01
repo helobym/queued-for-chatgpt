@@ -1,12 +1,13 @@
-Queued for ChatGPT v1.2.0 — Independent Chrome extension prototype
+Queued for ChatGPT v1.2.1 — Independent Chrome extension
 
 Source code, styles and icons in this package are independent project work.
 No Superpower for ChatGPT extension code or assets were copied.
 No Superpower account, license or subscription is needed.
 
 This software is unofficial and is not endorsed by OpenAI or Superpower.
-No public distribution license is assigned in this package.
-Choose distribution terms before public release.
+Copyright (c) 2026 Helobym Networking (Malaysia). All rights reserved.
+This project is proprietary. See LICENSE for permission and distribution terms.
+Confirm the legal rightsholder and any required rights assignments before public release.
 
 The extension interacts with the ChatGPT webpage, which may change.
 Use short test prompts initially; review uncertain sends and export workflows
