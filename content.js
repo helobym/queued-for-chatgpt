@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.1 — start saved workflows directly with exclusive send ownership. */
+/* Queued for ChatGPT v1.2.2 — start or append saved workflows safely. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
