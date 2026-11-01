@@ -1,10 +1,10 @@
-# Queued for ChatGPT v1.2.2 (main source) — Start or Load Workflows
+# Queued for ChatGPT v1.2.2 — Start or Load Workflows
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇️ Download the latest release (v1.2.1)](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.1)** — ready-to-extract Chrome extension ZIP, release notes, and SHA-256 checksum. No Chrome Web Store account needed.
+**[⬇️ Download v1.2.2](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2)** — installation ZIP, release notes, and SHA-256 checksum. No Chrome Web Store account required.
 
-**New in v1.2.2 source (not yet packaged as a Release):** Each saved workflow now has both **▶ Start Workflow** and **+ Load**. **Load** appends its steps to the end of the current conversation queue without starting a paused queue. If the queue is already running, the new steps run automatically after the existing queued prompts. It does not interrupt, reorder, or restart the active prompt. To try this version, use **Code → Download ZIP** from the `main` branch, not the v1.2.1 Release asset.
+**New in v1.2.2:** Each saved workflow now has both **▶ Start Workflow** and **+ Load**. **Load** appends its steps to the end of the current conversation queue without starting a paused queue. If the queue is already running, the new steps run automatically after the existing queued prompts. It does not interrupt, reorder, or restart the active prompt.
 
 **Testing release.** The automated checks use simulated ChatGPT pages. Compatibility with your live ChatGPT account and Chromebook memory consumption are not yet verified.
 
@@ -12,13 +12,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [latest GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.1), expand **Assets**, and download **`queued-for-chatgpt-v1.2.1.zip`**. (Alternatively, use **Code → Download ZIP** on the repository page.)
+1. Open the [latest GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2), expand **Assets**, and download **`queued-for-chatgpt-v1.2.2.zip`**. (Alternatively, use **Code → Download ZIP** on the repository page.)
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list (**1.2.1** for the release ZIP, **1.2.2** for current `main` source).
+7. Check that **Queued for ChatGPT** appears in your extensions list (**1.2.2**).
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -27,7 +27,7 @@ Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Ins
 
 ## Screenshots
 
-The screenshots below show the **v1.2.1 Queue and Saved Workflows panels**, with illustrative prompts on a simulated ChatGPT page. They are interface demos, **not captures of a real user conversation or a live ChatGPT session**.
+The Queue PNG is a simulated ChatGPT UI capture from v1.2.1 (the Queue panel itself is unchanged in v1.2.2). The Workflows SVG is an **illustrative v1.2.2 panel mockup**, showing the new Load action. Neither image contains a real conversation.
 
 ### Queue
 
@@ -35,9 +35,17 @@ The screenshots below show the **v1.2.1 Queue and Saved Workflows panels**, with
 
 ### Saved Queue Workflows
 
-![Queued for ChatGPT — Saved Workflows with Start Workflow button](screenshots/workflows.png)
+![Queued for ChatGPT — Saved Workflows with Start Workflow and Load buttons](screenshots/workflows-v1.2.2.svg)
 
-## What changed in the v1.2.1 release from v1.2.0
+## What changed in v1.2.2
+
+- **+ Load** is available beside **▶ Start Workflow**. Load appends all steps in order without activating or restarting a stopped queue.
+- While a queue is running, Load adds the workflow behind existing prompts; the current sender continues automatically through the new steps.
+- Loading respects the 100-prompt cap, is atomic and retry-safe, and preserves in-flight prompt status.
+- The runner waits for a Load already in progress before declaring a local queue complete.
+- Updated tests and release packaging, installation instructions, and manual upgrade checklist.
+
+## What changed in v1.2.1 from v1.2.0
 
 - **▶ Start Workflow** replaces **+ Load to Queue** on each saved workflow.
 - Clicking once **appends all workflow steps to the current conversation's queue and starts sending immediately**. It no longer requires a second click on the main Queue **Start** button.
@@ -54,14 +62,14 @@ The screenshots below show the **v1.2.1 Queue and Saved Workflows panels**, with
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download the [latest release ZIP](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.1) (or choose **Code → Download ZIP** from the repository) and extract it.
+2. Download the [latest release ZIP](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.2) (or choose **Code → Download ZIP** from the repository) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs to load the new content script.
 
 Changing the extension's ID (for example, by installing from a different folder) can make your old locally stored queues and workflows inaccessible to the new copy. Export backups before upgrading, and check uncertain sends manually to avoid duplicates.
 
-## How to use Load Workflow (v1.2.2 source)
+## How to use Load Workflow
 
 1. Open **Workflows** and find the saved workflow you want.
 2. Click **+ Load**. All its steps append after the current queued prompts, preserving their order.
@@ -103,7 +111,7 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 
 ## Automated tests
 
-`node --test tests/*.test.js` — 29 unit/coordinator/background tests.
+`node --test tests/*.test.js` — automated unit/coordinator/background test suite (includes active-queue Load coverage).
 
 Playwright (installed Chromium, simulated page):
 
