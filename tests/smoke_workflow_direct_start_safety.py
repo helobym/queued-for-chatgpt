@@ -36,7 +36,7 @@ def workflow(page):
     page.locator('#qfc-step-1').fill('Workflow step 2')
     page.locator('[data-action="save-workflow-edit"]').click()
     page.locator('#qfc-workflow-items').get_by_text('Save steps').wait_for()
-    assert page.locator('[data-action="load-workflow"]').count() == 0
+    assert page.locator('[data-action="load-workflow"]').count() == 1
     assert page.locator('[data-action="start-workflow"]').count() == 1
 
 
