@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.2 (2026-11-01)
+
+- Restored **+ Load** beside **▶ Start Workflow** for saved workflows.
+- Load appends all workflow steps at the queue tail without starting an idle queue.
+- If a conversation is already running, its sender continues to the loaded workflow after completing all earlier prompts; the active prompt is not interrupted or re-sent.
+- Preserved atomic capacity checks, in-flight statuses, and idempotent coordinator appends.
+- Improved end-of-queue handling for a Load operation already underway in the same tab.
+- Added queue-order and mock-browser regression tests, refreshed docs, and prepared the v1.2.2 release.
+- JavaScript syntax and coordinator checks passed; live-site/Chromebook verification remains pending.
+
+
 ## 1.2.1 (2026-10-31)
 
 - Renamed saved workflow action to **▶ Start Workflow**: one click appends the entire workflow and begins sequential sending.
