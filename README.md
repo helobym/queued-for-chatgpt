@@ -4,6 +4,23 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 **Testing release.** The automated checks use simulated ChatGPT pages. Compatibility with your live ChatGPT account and Chromebook memory consumption are not yet verified.
 
+## Installation (Chrome / Chromebook)
+
+Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
+
+1. At the top of this repository, click the green **Code** button, then **Download ZIP**.
+2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location, such as `Downloads/queued-for-chatgpt-main`.
+3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
+4. In Chrome, enter **`chrome://extensions`** in the address bar.
+5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
+6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
+7. Check that **Queued for ChatGPT** appears in your extensions list (currently version **1.2.1**).
+8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
+
+**First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
+
+**Notes:** An unpacked extension loads from its folder, so **do not delete or move that folder** after installation. Changes from GitHub **do not auto-install**; update manually using the steps below. If you use a school/work-managed Chromebook, your administrator may block Developer mode or unpacked extensions. If the floating button doesn't appear, verify the extension is enabled, then refresh the ChatGPT tab and check **Errors** on `chrome://extensions`.
+
 ## Screenshots
 
 The screenshots below show the **v1.2.1 Queue and Saved Workflows panels**, with illustrative prompts on a simulated ChatGPT page. They are interface demos, **not captures of a real user conversation or a live ChatGPT session**.
@@ -28,15 +45,17 @@ The screenshots below show the **v1.2.1 Queue and Saved Workflows panels**, with
 - A workflow is appended all-or-none; insufficient queue capacity prevents adding any steps or starting the queue.
 - **Normal Queue Start remains available**, including for manually typed prompts. No other queue, storage, workflow editing, multi-tab, or floating-panel behavior was intentionally changed.
 
-## Upgrade safely from v1.2.0
+## Updating an existing installation
 
-1. **Do not uninstall** v1.2.0: uninstalling may delete locally saved queues and workflows.
-2. Extract `queued-for-chatgpt-v1.2.1.zip` in the Chromebook Files app.
-3. Copy the new files into the **same existing unpacked extension folder**, replacing matching files. Keep the extension ID unchanged.
-4. Go to `chrome://extensions`, click **Reload** on the existing **Queued for ChatGPT** card, and confirm version **1.2.1** and the same ID.
-5. Refresh all open ChatGPT tabs and windows to load the updated UI.
+Unpacked extensions **do not update automatically from GitHub**.
 
-If you've stored important workflow data, export it from the Workflows panel before changing files. Do not install a second copy alongside the old extension.
+1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
+2. Download the latest repository ZIP again using **Code → Download ZIP**, and extract it.
+3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
+4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
+5. Refresh all ChatGPT tabs to load the new content script.
+
+Changing the extension's ID (for example, by installing from a different folder) can make your old locally stored queues and workflows inaccessible to the new copy. Export backups before upgrading, and check uncertain sends manually to avoid duplicates.
 
 ## How to use Start Workflow
 
