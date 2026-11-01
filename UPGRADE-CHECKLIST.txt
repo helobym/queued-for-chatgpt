@@ -1,20 +1,23 @@
-QUEUED FOR CHATGPT — v1.2.0 to v1.2.1
+QUEUED FOR CHATGPT — v1.2.1 to v1.2.2
 
-[ ] Export important Saved Workflows as JSON backup.
-[ ] Do not uninstall the existing extension or change its extension ID.
-[ ] Extract v1.2.1 and replace files inside the SAME unpacked directory.
-[ ] chrome://extensions → Reload; verify version 1.2.1 and same ID.
-[ ] Reload every open ChatGPT tab/window.
-[ ] Open Workflows → confirm each saved item now says "▶ Start Workflow".
-[ ] In New Chat, click Start Workflow on a harmless 2-step workflow.
-[ ] Check that step 2 starts after step 1 finishes WITHOUT clicking Queue Start.
-[ ] If the chat already has pending items, confirm they send first (or cancel).
-[ ] Check another tab showing the same chat cannot also begin sending.
-[ ] Verify floating-panel dragging and workflow editing still work.
+[ ] Export important Saved Queue Workflows as a JSON backup before upgrading.
+[ ] Let any running prompts finish or pause the queue. Review uncertain in-flight items.
+[ ] Keep the existing unpacked extension directory and extension ID.
+[ ] Download queued-for-chatgpt-v1.2.2.zip from the GitHub v1.2.2 Release.
+[ ] Extract it, then replace the extension files in that SAME directory.
+[ ] In chrome://extensions, press Reload and confirm version 1.2.2.
+[ ] Refresh all open ChatGPT tabs/windows (the old content script must be replaced).
+[ ] In Workflows, verify both "▶ Start Workflow" and "+ Load" appear.
+[ ] Click "+ Load" on a harmless workflow when the queue is stopped; confirm no prompt sends.
+[ ] Click Queue Start, and confirm the loaded prompts send sequentially.
+[ ] With two harmless prompts already running/queued, use "+ Load" to add a workflow.
+[ ] Confirm loaded steps append after the existing prompts and send automatically in sequence.
+[ ] Check workflow backups, draggable panel, and New Chat remain functional.
 
 IMPORTANT:
-- Start Workflow appends all steps and sends immediately, rather than just loading.
-- An existing pending queue sends BEFORE appended workflow steps, after approval.
-- Uncertain messages require review; never blindly retry already sent prompts.
-- Keep one extension copy, with the same ID, to preserve storage.
-- Tested on simulated pages; live Chromebook compatibility still needs testing.
+- "+ Load" never starts a stopped queue. It appends in order.
+- While the queue is running, Load does NOT restart or interrupt the active sender.
+- "▶ Start Workflow" still starts an idle queue and asks before running existing pending prompts.
+- Capacity limit: 100 queued prompts. A workflow is appended all-or-none.
+- Review uncertain sends manually; never blindly retry a prompt that might have been sent.
+- Live ChatGPT account and Chromebook resource use remain unverified.
