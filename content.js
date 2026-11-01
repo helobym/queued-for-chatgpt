@@ -164,7 +164,7 @@
       setTab('queue');
       notify(state.running
         ? `Added ${workflow.steps.length} step(s) from “${workflow.name}” to the running queue.`
-        : `Loaded ${workflow.steps.length} step(s) from “${workflow.name}”. Start when ready.`);
+        : `Loaded ${workflow.steps.length} step(s) from “${workflow.name}”. If the queue is stopped, press Start.`);
     } catch (error) {
       notify(error.message || 'Could not load workflow.');
     } finally {
