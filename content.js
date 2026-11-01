@@ -50,6 +50,8 @@
   let panelOffsetX = 0, panelOffsetY = 0;
   let panelDrag = null;
   const signalListeners = new Set();
+  // In-flight Load clicks must finish before an active runner decides the queue is empty.
+  const pendingWorkflowLoads = new Map();
 
   function wake() {
     for (const fn of Array.from(signalListeners)) fn();
@@ -130,6 +132,47 @@
     const record = await rpc('saveQueueWorkflow', { route: state.route, name }, makeOperationId());
     applyWorkflows(record);
     notify('Workflow saved. You can load it into any conversation.');
+  }
+  // Load is append-only: it does not acquire the sender lock, start a runner,
+  // or interrupt the tab already processing this conversation.
+  async function loadWorkflow(workflow) {
+    if (state.routeLoading || !state.storageHealthy) {
+      notify('The chat queue is not ready. Reload or try again.'); return;
+    }
+    const route = state.route;
+    if (!(route?.startsWith('chat:') || (route?.startsWith('new:') && isNewChatPage()))) {
+      notify('Open a ChatGPT conversation or New Chat page before loading.'); return;
+    }
+    const handoff = newChatHandoff;
+    pendingWorkflowLoads.set(route, (pendingWorkflowLoads.get(route) || 0) + 1);
+    try {
+      const record = await rpc('appendWorkflow', { route, workflowId: workflow.id }, makeOperationId());
+      applyQueue(route, record);
+      if (state.route !== route) {
+        // A New Chat may become a stable chat while the append is in flight.
+        // Move any steps appended after the ordinary temporary-queue migration.
+        if (route.startsWith('new:') && state.route?.startsWith('chat:') &&
+            (handoff?.destination === state.route || newChatHandoff?.destination === state.route)) {
+          applyQueue(state.route, await rpc('moveTemp', {
+            source: route, destination: state.route
+          }, makeOperationId()));
+        } else {
+          notify('Conversation changed while loading. Review the previous conversation queue.');
+          return;
+        }
+      }
+      setTab('queue');
+      notify(state.running
+        ? `Added ${workflow.steps.length} step(s) from “${workflow.name}” to the running queue.`
+        : `Loaded ${workflow.steps.length} step(s) from “${workflow.name}”. Start when ready.`);
+    } catch (error) {
+      notify(error.message || 'Could not load workflow.');
+    } finally {
+      const remaining = (pendingWorkflowLoads.get(route) || 1) - 1;
+      if (remaining) pendingWorkflowLoads.set(route, remaining);
+      else pendingWorkflowLoads.delete(route);
+      wake();
+    }
   }
   async function editWithLock(fn) {
     // Reject changes while a second tab owns this conversation's sender lock.
@@ -440,6 +483,8 @@
         'Add this workflow to the current conversation and immediately begin sending');
       startButton.classList.add('qfc-primary');
       actions.append(startButton,
+        actionButton('+ Load', 'load-workflow', workflow.id,
+          'Append these prompts to the queue without starting it'),
         actionButton('Edit', 'edit-workflow', workflow.id, 'Edit name and steps'),
         actionButton('Delete', 'remove-workflow', workflow.id, 'Delete saved workflow'));
       row.append(actions); frag.append(row);
@@ -566,6 +611,9 @@
         render(); break;
       case 'start-workflow':
         if (workflow) startQueue(workflow.id);
+        break;
+      case 'load-workflow':
+        if (workflow) await loadWorkflow(workflow);
         break;
       case 'new-workflow': openWorkflowEditor(null); break;
       case 'edit-workflow': if (workflow) openWorkflowEditor(workflow); break;
@@ -849,7 +897,14 @@
   }
   async function runQueue(route) {
     try {
-      while (healthyRoute(route) && state.queue.length) {
+      while (healthyRoute(route)) {
+        if (!state.queue.length) {
+          if (pendingWorkflowLoads.get(route)) {
+            await signalOrTimeout(250);
+            continue;
+          }
+          break;
+        }
         const item = state.queue[0];
         if (item.status !== 'pending') {
           pause('Review uncertain message. Use ✓ Done or ↺ Retry before resuming.'); return;
