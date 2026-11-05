@@ -5,7 +5,6 @@
   globalThis.__qfcContentLoaded = true;
   const C = globalThis.QFC;
   const STORAGE = chrome.storage.local;
-  const SEND_SELECTORS = '[data-testid="send-button"], [data-testid="composer-submit-button"], button[type="submit"]';
   // Recent ChatGPT app-shell renders messages under a timeline using search-unit
   // attributes, not the legacy author-role attributes. Preserve both families.
   const USER_SELECTORS = [
