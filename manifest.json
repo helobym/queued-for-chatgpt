@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Queued for ChatGPT",
   "short_name": "Queued for ChatGPT",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "Lightweight ChatGPT prompt queues, saved workflows and current/previous activity, with multi-tab coordination and a draggable panel.",
   "permissions": [
     "storage"

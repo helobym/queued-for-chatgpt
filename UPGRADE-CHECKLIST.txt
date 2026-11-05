@@ -1,11 +1,11 @@
-QUEUED FOR CHATGPT — v1.2.2 to v1.2.3
+QUEUED FOR CHATGPT — v1.2.3 to v1.2.4
 
 [ ] Export important Saved Queue Workflows as a JSON backup before upgrading.
 [ ] Let any running prompts finish or pause the queue. Review uncertain in-flight items.
 [ ] Keep the existing unpacked extension directory and extension ID.
-[ ] Download queued-for-chatgpt-v1.2.3.zip from the GitHub v1.2.3 Release (Assets).
+[ ] Download queued-for-chatgpt-v1.2.4.zip from the GitHub v1.2.4 Release (Assets).
 [ ] Extract it, then replace the extension files in that SAME directory.
-[ ] In chrome://extensions, press Reload and confirm version 1.2.3.
+[ ] In chrome://extensions, press Reload and confirm version 1.2.4.
 [ ] Refresh all open ChatGPT tabs/windows (the old content script must be replaced).
 [ ] In Workflows, verify both "▶ Start Workflow" and "+ Load" appear.
 [ ] Click "+ Load" on a harmless workflow when the queue is stopped; confirm no prompt sends.
@@ -15,6 +15,10 @@ QUEUED FOR CHATGPT — v1.2.2 to v1.2.3
 [ ] Start two harmless prompts and confirm Recent activity shows Current and Previous correctly.
 [ ] Load a saved workflow during execution; confirm workflow ID and step attribution appear.
 [ ] Refresh the chat; confirm Previous remains and uncertain prompts are not marked completed.
+[ ] Send two harmless prompts; confirm that each waits for the prior response.
+[ ] Repeat an identical harmless prompt twice; verify two actual submitted user turns.
+[ ] If an attempted send leaves a draft, verify the extension does NOT auto-click Send again.
+[ ] Review uncertain items before Done or Retry; clear a stale draft before retrying.
 [ ] Check workflow backups, draggable panel, and New Chat remain functional.
 
 IMPORTANT:

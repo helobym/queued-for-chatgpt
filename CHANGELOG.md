@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.4 (2026-11-06)
+
+- Improved active Send-button selection and readiness checks.
+- Added pre-send user-turn baselines and strengthened receipt verification so re-rendered historical messages do not count as a new sent prompt.
+- A matching unsent draft blocks false receipt confirmation; ignored clicks pause safely instead of incorrectly advancing to Awaiting response.
+- Preserved the single-send attempt, manual recovery, New Chat first-turn handling, Saved Workflows and existing local storage format.
+- Added simulated Chromium regression coverage for consecutive identical prompts and an ignored Send click.
+- Updated installation ZIP, SHA-256 release packaging, documentation, upgrade checklist and illustrative UI screenshots.
+- Real-account ChatGPT compatibility remains unverified.
+
 ## 1.2.3 (2026-11-01)
 
 - Added a compact Current / Previous activity strip shared by Queue and Workflows views.

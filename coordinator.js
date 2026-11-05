@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.3 — deterministic mutation functions, no dependencies. */
+/* Queued for ChatGPT v1.2.4 — deterministic mutation functions, no dependencies. */
 (function (root) {
   'use strict';
   const C = root.QFC || (typeof require !== 'undefined' ? require('./core.js') : null);

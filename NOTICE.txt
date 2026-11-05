@@ -1,4 +1,4 @@
-Queued for ChatGPT v1.2.2 — Independent Chrome extension
+Queued for ChatGPT v1.2.4 — Independent Chrome extension
 
 Source code, styles and icons in this package are independent project work.
 No Superpower for ChatGPT extension code or assets were copied.

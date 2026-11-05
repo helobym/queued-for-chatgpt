@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.3 — lightweight recent queue activity. */
+/* Queued for ChatGPT v1.2.4 — lightweight recent queue activity. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;

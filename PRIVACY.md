@@ -1,6 +1,6 @@
 # Privacy Policy — Queued for ChatGPT
 
-**Last updated:** 1 November 2026  
+**Last updated:** 6 November 2026  
 **Publisher:** Helobym Networking (Malaysia)
 
 Queued for ChatGPT is a browser extension that helps users save prompt workflows and send queued prompts through ChatGPT. It is an independent project and is not affiliated with OpenAI.

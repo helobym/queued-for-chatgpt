@@ -1,26 +1,28 @@
-# Queued for ChatGPT v1.2.3 — Recent Queue Activity
+# Queued for ChatGPT v1.2.4 — Reliable Sending
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.3](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.3)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.4](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.4)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.4:** Send verification now checks for a genuinely new user turn before moving an item to Awaiting response. An ignored Send click, a re-rendered historical message, or a matching unsent composer draft is no longer treated as confirmed submission. The Send control is selected more carefully. Existing queue/workflow storage and safety recovery remain compatible.
 
 **New in v1.2.3:** The floating panel shows **Current** (a prompt being prepared, sent, or awaited) and **Previous** (the last confirmed completed prompt) without scrolling through ChatGPT. Saved workflow steps retain their workflow name, ID and step position. Only one short completed-prompt preview is retained per conversation in local browser storage.
 
 **New in v1.2.2:** Each saved workflow now has both **▶ Start Workflow** and **+ Load**. **Load** appends its steps to the end of the current conversation queue without starting a paused queue. If the queue is already running, the new steps run automatically after the existing queued prompts. It does not interrupt, reorder, or restart the active prompt.
 
-**Testing release.** The automated checks use simulated ChatGPT pages. Compatibility with your live ChatGPT account and Chromebook memory consumption are not yet verified.
+**Testing release.** Automated checks use simulated ChatGPT pages, not a live ChatGPT account. Compatibility with your live ChatGPT account and Chromebook memory consumption are not yet verified.
 
 ## Installation (Chrome / Chromebook)
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.3 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.3), expand **Assets**, and download **`queued-for-chatgpt-v1.2.3.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.4 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.4), expand **Assets**, and download **`queued-for-chatgpt-v1.2.4.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.3**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.4**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -29,15 +31,25 @@ Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Ins
 
 ## Screenshots
 
-Both screenshots below are **illustrative v1.2.3 interface mockups** showing the compact Recent Activity strip shared by Queue and Workflows. They are not live ChatGPT captures and contain no real conversation data. Older screenshots remain in `screenshots/` for reference.
+Both screenshots below are **illustrative v1.2.4 interface mockups** showing the compact Recent Activity strip shared by Queue and Workflows. They are not live ChatGPT captures and contain no real conversation data. Older screenshots remain in `screenshots/` for reference.
 
 ### Queue
 
-![Queued for ChatGPT v1.2.3 — Queue panel with Current and Previous activity](screenshots/queue-v1.2.3.svg)
+![Queued for ChatGPT v1.2.4 — Queue panel with Current and Previous activity](screenshots/queue-v1.2.4.svg)
 
 ### Saved Queue Workflows
 
-![Queued for ChatGPT v1.2.3 — Workflows with Recent Activity and Start/Load buttons](screenshots/workflows-v1.2.3.svg)
+![Queued for ChatGPT v1.2.4 — Workflows with Recent Activity and Start/Load buttons](screenshots/workflows-v1.2.4.svg)
+
+## What changed in v1.2.4
+
+- Prefers ChatGPT's explicit Send controls; rejects ambiguous submit controls and checks the button's disabled state.
+- Records a pre-send user-turn baseline and requires evidence of a genuinely new user turn before changing `sending` to `awaiting`.
+- Rejects false receipts from re-rendered historical messages or a matching unsent composer draft.
+- If a Send click is ignored, the queued prompt stays unresolved for manual review rather than automatically retrying and risking duplicate messages.
+- Preserves existing response-completion checks, New Chat handoff, Saved Workflows, Recent Activity, multi-tab locks, and local storage.
+- Adds regression coverage for identical consecutive prompts and an ignored Send click with DOM re-rendering.
+- No new Chrome permissions, APIs, servers, or telemetry.
 
 ## What changed in v1.2.3
 
@@ -72,7 +84,7 @@ Both screenshots below are **illustrative v1.2.3 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.3.zip`** from the [v1.2.3 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.3) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.4.zip`** from the [v1.2.4 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.4) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs to load the new content script.
@@ -121,7 +133,7 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 
 ## Automated tests
 
-`node --test tests/*.test.js` — automated unit/coordinator/background test suite (includes workflow metadata, recent completion snapshots, and active-queue Load coverage). The GitHub Release workflow runs these tests before publishing the installation archive.
+`node --test tests/*.test.js` — automated unit/coordinator/background test suite (includes workflow metadata, recent completion snapshots, and active-queue Load coverage). The GitHub Release workflow runs these tests and targeted simulated Chromium regressions before publishing the installation archive.
 
 Playwright (installed Chromium, simulated page):
 
@@ -131,6 +143,7 @@ Playwright (installed Chromium, simulated page):
 - `tests/smoke_workflow_direct_start_safety.py` — three safety cases: existing queue approval, lock refusal, uncertain item.
 - `tests/smoke_browser.py`, `tests/smoke_new_chat.py`, `tests/smoke_app_shell.py`, `tests/smoke_draggable_panel.py` — regression scenarios.
 - `tests/smoke_app_shell_uncertain.py`, `tests/smoke_first_reply_uncertain.py` — two uncertainty safeguards.
+- `tests/smoke_send_receipt_safety.py` — repeated prompts and ignored Send clicks with a re-rendered earlier message.
 
 No live-site or Chromebook memory test was possible here. Begin with two harmless prompts in a new chat while watching the first run.
 
