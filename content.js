@@ -766,9 +766,15 @@
   function findSendButton(editor) {
     const area = composerArea(editor);
     if (!area) return null;
-    const candidates = [...area.querySelectorAll(SEND_SELECTORS)].filter(button => button.tagName === 'BUTTON' && button.getClientRects().length);
-    const nonStop = candidates.filter(button => !button.matches(STOP_SELECTORS) && !button.querySelector('svg.icon-primary-action path[d^="M4.5 5.75"]'));
-    return nonStop.length === 1 ? nonStop[0] : null;
+    const eligible = selector => [...area.querySelectorAll(selector)].filter(button =>
+      button.tagName === 'BUTTON' && button.isConnected && button.getClientRects().length &&
+      !button.matches(STOP_SELECTORS) &&
+      !button.querySelector('svg.icon-primary-action path[d^="M4.5 5.75"]'));
+    // Prefer ChatGPT's explicit Send controls. A generic form submit button
+    // is only a fallback, and ambiguity must never result in a wrong click.
+    const explicit = eligible('[data-testid="send-button"], [data-testid="composer-submit-button"]');
+    const candidates = explicit.length ? explicit : eligible('button[type="submit"]');
+    return candidates.length === 1 ? candidates[0] : null;
   }
   function isGenerating() {
     const editor = findEditor();
@@ -854,9 +860,13 @@
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline && healthyRoute(route)) {
       const button = findSendButton(editor);
-      if (button && !button.disabled && C.normalize(editorText(editor)) === C.normalize(text) && !isGenerating()) {
+      if (button && !button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
+          !button.closest('[inert]') && C.normalize(editorText(editor)) === C.normalize(text) &&
+          !isGenerating()) {
         // Record the intentional send before clicking: the site may update its URL immediately.
         if (newChatHandoff?.from === route) newChatHandoff.clickedAt = Date.now();
+        // This is an attempt, not proof of acceptance. Receipt verification
+        // in the caller must succeed before changing to "awaiting".
         button.click();
         return true;
       }
@@ -865,17 +875,52 @@
     pause('Could not verify the Send button. Check draft before retrying.');
     return false;
   }
-  async function waitForReceipt(text, oldUser, route) {
+  // DOM nodes can be replaced when ChatGPT re-renders a conversation. A new
+  // node containing the old prompt is NOT sufficient evidence of submission.
+  function userTurnKey(message) {
+    if (!message) return null;
+    const attributes = ['data-message-id', 'data-chatgpt-search-unit-key',
+      'data-content-search-unit-key', 'data-turn-key'];
+    for (const attribute of attributes) {
+      const owner = message.closest('[' + attribute + ']');
+      const value = owner?.getAttribute(attribute);
+      if (value) return attribute + ':' + value;
+    }
+    const turn = message.closest('[data-testid^="conversation-turn-"]');
+    return turn ? 'conversation-turn:' + turn.getAttribute('data-testid') : null;
+  }
+  function snapshotUserTurns() {
+    const messages = userMessages();
+    return { count: messages.length,
+      keys: new Set(messages.map(userTurnKey).filter(Boolean)) };
+  }
+  function hasNewUserReceipt(text, baseline) {
+    const messages = userMessages();
+    const newest = messages.at(-1);
+    if (!newest || C.normalize(extractMessage(newest)) !== C.normalize(text)) return false;
+    const key = userTurnKey(newest);
+    if (key && baseline.keys.has(key)) return false;
+    const grew = messages.length > baseline.count;
+    // When older turns are virtualized away, a new stable key plus an old
+    // surviving key still proves that a genuinely new turn was appended.
+    const retainedOldKey = baseline.keys.size > 0 &&
+      messages.some(message => baseline.keys.has(userTurnKey(message)));
+    if (!grew && !(key && retainedOldKey)) return false;
+    // A matching unsent draft is evidence against successful submission,
+    // even if ChatGPT has replaced older message nodes.
+    const editor = findEditor();
+    if (editor && C.normalize(editorText(editor)) === C.normalize(text)) return false;
+    return true;
+  }
+  async function waitForReceipt(text, baseline, route) {
     const deadline = Date.now() + 15000;
     while (healthyRoute(route) && Date.now() < deadline) {
-      const all = userMessages();
-      const newest = all[all.length - 1];
-      if (newest && newest !== oldUser && C.normalize(extractMessage(newest)) === C.normalize(text)) return true;
+      if (hasNewUserReceipt(text, baseline)) return true;
       await signalOrTimeout(Math.min(1250, deadline - Date.now()));
     }
     return false;
   }
-  async function waitForFirstTurnEvidence(text, oldUser, oldAssistant, route) {
+  async function waitForFirstTurnEvidence(text, userBaseline, oldAssistant, route) {
     // The first send creates a chat and can re-render the original user turn.
     // ChatGPT sometimes changes the user's message markup during that transition;
     // requiring an exact user-bubble match alone causes a false negative.
@@ -886,9 +931,7 @@
     let sawStop = false;
     while (healthyRoute(route) && Date.now() < deadline) {
       if (isGenerating()) sawStop = true;
-      const latestUser = userMessages().at(-1);
-      if (latestUser && latestUser !== oldUser &&
-          C.normalize(extractMessage(latestUser)) === C.normalize(text)) {
+      if (hasNewUserReceipt(text, userBaseline)) {
         return { receipt: 'user', sawStop };
       }
       const latestAssistant = assistantMessages().at(-1);
@@ -961,7 +1004,7 @@
         }
         const idle = await waitForComposerIdle(route, Date.now() + 10 * 60 * 1000);
         if (!idle || !healthyRoute(route)) return;
-        const oldUser = userMessages().at(-1);
+        const userBaseline = snapshotUserTurns();
         const oldAssistant = assistantMessages().at(-1);
         await queueOp('sending', { id: item.id }, route); render();
         const clicked = await sendMessage(item.text, route);
@@ -971,7 +1014,7 @@
           return;
         }
         setStatus('Checking submitted prompt…');
-        const received = await waitForReceipt(item.text, oldUser, route);
+        const received = await waitForReceipt(item.text, userBaseline, route);
         if (!received) { pause('Could not confirm sent message. Check ChatGPT before continuing.'); return; }
         await queueOp('awaiting', { id: item.id }, route); render();
         setStatus('Waiting for response to finish…');
@@ -991,7 +1034,7 @@
     }
     if (!await waitForComposerIdle(temporaryRoute, Date.now() + 10 * 60 * 1000)) return;
     if (!healthyRoute(temporaryRoute)) return;
-    const previousUser = userMessages().at(-1);
+    const previousUsers = snapshotUserTurns();
     const previousAssistant = assistantMessages().at(-1);
     await queueOp('sending', { id: first.id }, temporaryRoute);
     newChatHandoff = { from: temporaryRoute, id: first.id, text: first.text,
@@ -1023,7 +1066,7 @@
         pause('Could not verify queue migration. Review first prompt before resuming.'); return;
       }
       setStatus('Checking the first submitted prompt or reply…');
-      const evidence = await waitForFirstTurnEvidence(handoff.text, previousUser, previousAssistant, stableRoute);
+      const evidence = await waitForFirstTurnEvidence(handoff.text, previousUsers, previousAssistant, stableRoute);
       if (!evidence) {
         pause('First send could not be confirmed. Check ChatGPT before resuming.'); return;
       }
