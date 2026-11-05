@@ -37,11 +37,12 @@ def open_queue(browser):
 
 
 def add_duplicate_prompts(page):
-    for _ in range(2):
+    for count in (1, 2):
         page.locator('#qfc-compose').fill('Repeat exactly this prompt')
         page.locator('#qfc-add').click()
-    page.wait_for_function(
-        "document.querySelector('#qfc-count').textContent === '2'")
+        page.wait_for_function(
+            "(expected) => document.querySelector('#qfc-count').textContent === String(expected)",
+            arg=count)
 
 
 with sync_playwright() as p:
