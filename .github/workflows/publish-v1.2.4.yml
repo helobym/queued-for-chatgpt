@@ -76,7 +76,7 @@ jobs:
 
           root = pathlib.Path('.')
           manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
-          assert manifest['version'] == '1.2.3', 'This workflow only publishes v1.2.4'
+          assert manifest['version'] == '1.2.4', 'This workflow only publishes v1.2.4'
           required = [
               'manifest.json', 'background.js', 'content.js', 'content.css',
               'core.js', 'coordinator.js', 'LICENSE', 'NOTICE.txt',
