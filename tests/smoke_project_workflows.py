@@ -84,12 +84,14 @@ with sync_playwright() as playwright:
     page.locator('#qfc-compose').fill('Only in Project B')
     page.locator('#qfc-add').click()
     page.wait_for_function("document.querySelector('#qfc-count').textContent === '1'")
+    page.wait_for_function("document.querySelector('.qfc-dock').dataset.phase === 'paused'")
     assert '1 pending' in page.locator('#qfc-dock-count').inner_text()
     route_b = page.evaluate(
         "sessionStorage.getItem('qfc_v1_temporary_conversation_project_g-p-project-b')")
     assert route_b and route_a != route_b, (route_a, route_b)
     navigate(page, PROJECT_A + '/')
     page.wait_for_function("document.querySelector('#qfc-count').textContent === '2'")
+    page.wait_for_function("document.querySelector('.qfc-dock').dataset.phase === 'paused'")
     assert '2 pending' in page.locator('#qfc-dock-count').inner_text()
     assert page.locator('#qfc-queue-items').get_by_text('First Project prompt').count() == 1
 
