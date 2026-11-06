@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.5 — Project workflow support and prompt Copy. */
+/* Queued for ChatGPT v1.2.6 — live dock and expandable, copyable saved workflows. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -38,7 +38,7 @@
   const state = {
     route: null, queue: [], lastCompleted: null, workflows: [], tab: 'queue', open: false,
     editingQueueId: null, workflowDraft: null,
-    running: false, status: 'Paused', waiting: false, queueRev: -1, workflowsRev: -1,
+    running: false, senderLockRoute: null, status: 'Paused', waiting: false, queueRev: -1, workflowsRev: -1,
     routeLoading: false, storageHealthy: true
   };
   let root, queueList, workflowsList, statusLine, queueTextArea, workflowSearch;
@@ -55,6 +55,9 @@
   const signalListeners = new Set();
   // In-flight Load clicks must finish before an active runner decides the queue is empty.
   const pendingWorkflowLoads = new Map();
+  // View-only state; never persist expanded prompt contents or runner ownership.
+  const expandedWorkflowIds = new Set();
+  let lastWorkflowRenderKey = null;
 
   function wake() {
     for (const fn of Array.from(signalListeners)) fn();
@@ -146,6 +149,8 @@
     if (!record || record.rev < state.workflowsRev) return;
     state.workflowsRev = record.rev;
     state.workflows = C.cleanWorkflows(record.items);
+    const available = new Set(state.workflows.map(workflow => workflow.id));
+    for (const id of expandedWorkflowIds) if (!available.has(id)) expandedWorkflowIds.delete(id);
     render();
   }
   async function queueOp(type, data = {}, route = state.route) {
@@ -266,6 +271,8 @@
     if (state.running && !expectedHandoff) pause('Conversation changed — queue paused.');
     if (expectedHandoff) newChatHandoff.destination = stable;
     state.route = route;
+    // Set loading BEFORE rendering the emptied route to avoid a false Idle flash.
+    state.routeLoading = true;
     state.queue = []; state.queueRev = -1; state.lastCompleted = null;
     render();
     setStatus(expectedHandoff ? 'New chat created — verifying first prompt…' :
@@ -291,7 +298,7 @@
     root = document.createElement('div');
     root.id = 'qfc-root';
     root.innerHTML = `
-      <button type="button" class="qfc-dock" data-action="toggle" aria-expanded="false" aria-controls="qfc-panel">☷ Queue <span id="qfc-dock-count">0</span></button>
+      <button type="button" class="qfc-dock" data-action="toggle" aria-expanded="false" aria-controls="qfc-panel">☷ Queue<span id="qfc-dock-status"> · Loading</span><span id="qfc-dock-count"></span></button>
       <section class="qfc-panel" id="qfc-panel" aria-label="Queued for ChatGPT" hidden>
         <header class="qfc-head">
           <div class="qfc-drag-handle" role="button" tabindex="0"
@@ -474,13 +481,43 @@
     });
     window.addEventListener('resize', () => setPanelPosition(panelOffsetX, panelOffsetY, { save: true }));
   }
+  function dockDisplay() {
+    if (!state.route || state.routeLoading) return { phase: 'loading', label: 'Loading', suffix: '' };
+    if (!state.storageHealthy) return { phase: 'unavailable', label: 'Unavailable', suffix: '' };
+    const pending = state.queue.filter(item => item.status === 'pending').length;
+    const owned = state.running && state.senderLockRoute === state.route;
+    if (state.running && !owned) {
+      return { phase: 'starting', label: 'Starting', suffix: pending ? ` · ${pending} pending` : '' };
+    }
+    if (owned) {
+      // The active item may still be pending while the runner prepares the composer.
+      const preparing = state.queue[0]?.status === 'pending' ? 1 : 0;
+      return { phase: 'running', label: 'Running', suffix: ` · ${Math.max(0, pending - preparing)} left` };
+    }
+    if (state.queue.some(item => item.status !== 'pending')) {
+      // A different tab may own the queue, or its send may require review.
+      return { phase: 'check', label: 'Check status', suffix: pending ? ` · ${pending} pending` : '' };
+    }
+    if (pending) return { phase: 'paused', label: 'Paused', suffix: ` · ${pending} pending` };
+    return { phase: 'idle', label: 'Idle', suffix: '' };
+  }
   function renderHeader() {
     if (!root) return;
     const count = state.queue.length;
+    const dock = root.querySelector('.qfc-dock');
+    const before = dock.textContent;
+    const display = dockDisplay();
     root.querySelector('#qfc-count').textContent = count;
-    root.querySelector('#qfc-dock-count').textContent = count;
+    root.querySelector('#qfc-dock-status').textContent = ' · ' + display.label;
+    root.querySelector('#qfc-dock-count').textContent = display.suffix;
+    dock.dataset.phase = display.phase;
+    dock.setAttribute('aria-label', `Queue, ${display.label}${display.suffix}`);
+    const headWorkflow = state.queue[0]?.workflow;
+    dock.title = headWorkflow && display.phase === 'running'
+      ? `${headWorkflow.name} · Step ${headWorkflow.step}/${headWorkflow.total}`
+      : `Queued for ChatGPT — ${display.label}${display.suffix}`;
     root.querySelector('#qfc-workflow-count').textContent = state.workflows.length;
-    root.querySelector('.qfc-dock').setAttribute('aria-expanded', String(state.open));
+    dock.setAttribute('aria-expanded', String(state.open));
     root.querySelector('#qfc-panel').hidden = !state.open;
     root.querySelector('#qfc-queue-view').hidden = state.tab !== 'queue';
     root.querySelector('#qfc-workflows-view').hidden = state.tab !== 'workflows';
@@ -495,6 +532,9 @@
         ? 'New chat: Start sends the first queued prompt to create this conversation.'
         : 'Open New Chat to start a queue.'
       : state.status;
+    if (before !== dock.textContent && !state.open) {
+      setPanelPosition(panelOffsetX, panelOffsetY);
+    }
   }
   function renderActivity() {
     if (!root) return;
@@ -560,30 +600,66 @@
   function renderWorkflows() {
     if (!workflowsList) return;
     const query = C.normalize(workflowSearch.value).toLocaleLowerCase();
+    const renderKey = JSON.stringify([state.workflowsRev, query, [...expandedWorkflowIds].sort()]);
+    // Queue status updates must not destroy Copy feedback, text selection or focus.
+    if (renderKey === lastWorkflowRenderKey) return;
+    const view = root.querySelector('#qfc-workflows-view');
+    const scrollTop = view.scrollTop;
+    const active = workflowsList.contains(document.activeElement) ? document.activeElement : null;
+    const focusedAction = active?.dataset?.action;
+    const focusedId = active?.dataset?.id;
+    const focusedStep = active?.dataset?.stepIndex;
     const found = state.workflows.filter(w =>
       C.normalize(w.name).toLocaleLowerCase().includes(query) ||
       w.steps.some(step => C.normalize(step).toLocaleLowerCase().includes(query)));
     const frag = document.createDocumentFragment();
     if (!found.length) frag.append(makeElement('p', 'qfc-empty', 'No saved workflows. Save the pending queue or create a workflow here.'));
-    for (const workflow of found) {
-      const row = makeElement('div', 'qfc-item');
+    for (const [index, workflow] of found.entries()) {
+      const expanded = expandedWorkflowIds.has(workflow.id);
+      const row = makeElement('div', 'qfc-item qfc-workflow-item');
       row.append(makeElement('div', 'qfc-workflow-title', workflow.name));
       row.append(makeElement('div', 'qfc-meta', `${workflow.steps.length} steps`));
-      const preview = makeElement('div', 'qfc-preview', workflow.steps.map((step, i) => `${i + 1}. ${step}`).join('\n'));
-      preview.title = workflow.steps.join('\n\n');
-      row.append(preview);
       const actions = makeElement('div', 'qfc-row qfc-item-actions');
+      const toggle = actionButton(expanded ? '▴ Collapse' : '▾ Expand',
+        'toggle-workflow', workflow.id, expanded ? 'Collapse saved workflow prompts' : 'Expand saved workflow prompts');
+      const details = makeElement('div', 'qfc-workflow-details');
+      details.id = `qfc-workflow-details-${index}`;
+      details.hidden = !expanded;
+      toggle.setAttribute('aria-expanded', String(expanded));
+      toggle.setAttribute('aria-controls', details.id);
       const startButton = actionButton('▶ Start Workflow', 'start-workflow', workflow.id,
         'Add this workflow to the current conversation and immediately begin sending');
       startButton.classList.add('qfc-primary');
-      actions.append(startButton,
+      actions.append(toggle, startButton,
         actionButton('+ Load', 'load-workflow', workflow.id,
           'Append these prompts to the queue without starting it'),
         actionButton('Edit', 'edit-workflow', workflow.id, 'Edit name and steps'),
         actionButton('Delete', 'remove-workflow', workflow.id, 'Delete saved workflow'));
-      row.append(actions); frag.append(row);
+      if (expanded) {
+        workflow.steps.forEach((step, stepIndex) => {
+          const entry = makeElement('div', 'qfc-workflow-prompt');
+          const heading = makeElement('div', 'qfc-workflow-prompt-head');
+          heading.append(makeElement('strong', 'qfc-meta', `Prompt ${stepIndex + 1}`));
+          const copy = actionButton('Copy', 'copy-workflow-step', workflow.id,
+            `Copy full prompt ${stepIndex + 1} from ${workflow.name}`);
+          copy.dataset.stepIndex = String(stepIndex);
+          heading.append(copy);
+          entry.append(heading, makeElement('div', 'qfc-workflow-prompt-text', step));
+          details.append(entry);
+        });
+      }
+      row.append(actions, details);
+      frag.append(row);
     }
     workflowsList.replaceChildren(frag);
+    lastWorkflowRenderKey = renderKey;
+    view.scrollTop = scrollTop;
+    if (focusedAction && focusedId) {
+      const restored = [...workflowsList.querySelectorAll('button[data-action]')].find(button =>
+        button.dataset.action === focusedAction && button.dataset.id === focusedId &&
+        button.dataset.stepIndex === focusedStep);
+      restored?.focus({ preventScroll: true });
+    }
   }
   function renderWorkflowEditor() {
     const editor = root.querySelector('#qfc-workflow-editor');
@@ -626,11 +702,34 @@
   }
   function pause(message = 'Paused') {
     state.running = false;
+    state.senderLockRoute = null;
     newChatHandoff = null;
     setStatus(message);
     wake();
   }
   function setTab(tab) { state.tab = tab; renderHeader(); }
+  async function copyPromptText(text, button, resetLabel) {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable.');
+      await navigator.clipboard.writeText(text);
+      if (button.isConnected) {
+        button.textContent = '✓ Copied';
+        button.setAttribute('aria-label', 'Prompt copied');
+      }
+    } catch (_) {
+      if (button.isConnected) {
+        button.textContent = 'Copy failed';
+        button.setAttribute('aria-label', 'Could not copy prompt');
+      }
+    }
+    // Feedback is local to the button and never changes execution status.
+    setTimeout(() => {
+      if (button.isConnected) {
+        button.textContent = 'Copy';
+        button.setAttribute('aria-label', resetLabel);
+      }
+    }, 1600);
+  }
   async function onPanelClick(event) {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
@@ -687,27 +786,7 @@
         if (!queueItem || queueItem.status !== 'pending' || state.running) { notify('Pause before removing.'); break; }
         await editWithLock(() => queueOp('remove', { id })); render(); break;
       case 'copy':
-        if (!queueItem) break;
-        try {
-          if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable.');
-          await navigator.clipboard.writeText(queueItem.text);
-          if (button.isConnected) {
-            button.textContent = '✓ Copied';
-            button.setAttribute('aria-label', 'Prompt copied');
-          }
-        } catch (_) {
-          if (button.isConnected) {
-            button.textContent = 'Copy failed';
-            button.setAttribute('aria-label', 'Could not copy prompt');
-          }
-        }
-        // Clipboard feedback is local to the button, never the running queue status.
-        setTimeout(() => {
-          if (button.isConnected) {
-            button.textContent = 'Copy';
-            button.setAttribute('aria-label', 'Copy full queued prompt');
-          }
-        }, 1600);
+        if (queueItem) await copyPromptText(queueItem.text, button, 'Copy full queued prompt');
         break;
       case 'save-queue-workflow': {
         const nameInput = root.querySelector('#qfc-workflow-name');
@@ -733,6 +812,20 @@
       case 'load-workflow':
         if (workflow) await loadWorkflow(workflow);
         break;
+      case 'toggle-workflow':
+        if (!workflow) break;
+        if (expandedWorkflowIds.has(id)) expandedWorkflowIds.delete(id);
+        else expandedWorkflowIds.add(id);
+        renderWorkflows();
+        setPanelPosition(panelOffsetX, panelOffsetY);
+        break;
+      case 'copy-workflow-step': {
+        const stepIndex = Number(button.dataset.stepIndex);
+        if (!workflow || !Number.isSafeInteger(stepIndex) || stepIndex < 0 ||
+            stepIndex >= workflow.steps.length) break;
+        await copyPromptText(workflow.steps[stepIndex], button, 'Copy full saved workflow prompt');
+        break;
+      }
       case 'new-workflow': openWorkflowEditor(null); break;
       case 'edit-workflow': if (workflow) openWorkflowEditor(workflow); break;
       case 'cancel-workflow-edit':
@@ -1127,6 +1220,8 @@
     // A second tab must not send to the newly created conversation while we verify the first prompt.
     await navigator.locks.request('qfc-queue-' + stableRoute, { ifAvailable: true }, async lock => {
       if (!lock) { pause('This new conversation is being controlled by another tab.'); return; }
+      state.senderLockRoute = stableRoute;
+      renderHeader();
       while (state.running && state.routeLoading && Date.now() < deadline) await signalOrTimeout(250);
       if (!healthyRoute(stableRoute) || !state.storageHealthy || state.routeLoading ||
           state.queue[0]?.id !== handoff.id || state.queue[0]?.status !== 'sending') {
@@ -1181,6 +1276,8 @@
     setStatus(workflow ? `Preparing workflow “${workflow.name}”…` : 'Starting queue…');
     navigator.locks.request('qfc-queue-' + route, { ifAvailable: true }, async lock => {
       if (!lock) { pause('Another tab is controlling this conversation queue.'); return; }
+      state.senderLockRoute = route;
+      renderHeader();
       try {
         applyQueue(route, await rpc('getQueue', { route }));
         if (workflow) {
