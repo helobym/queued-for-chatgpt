@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.4 — lightweight recent queue activity. */
+/* Queued for ChatGPT v1.2.5 — Project workflow support and prompt Copy. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -31,6 +31,9 @@
   const STOP_SELECTORS = '[data-testid="stop-button"], button[aria-label="Stop generating"], button[aria-label="Stop response"]';
   const PAGE_ID = C.newQueueItem('runtime').id;
   const TEMP_SESSION_KEY = 'qfc_v1_temporary_conversation';
+  // Keep distinct temporary queues for each Project while preserving ordinary New Chat storage.
+  const temporaryRouteCache = new Map();
+  const temporaryRouteKeys = new Map();
   const PANEL_POSITION_KEY = 'qfc_panel_position_v1';
   const state = {
     route: null, queue: [], lastCompleted: null, workflows: [], tab: 'queue', open: false,
@@ -40,6 +43,7 @@
   };
   let root, queueList, workflowsList, statusLine, queueTextArea, workflowSearch;
   let pageObserver, routeTimer, lastAssistantChange = Date.now();
+  let routeLoadGeneration = 0;
   let lastPathname = location.pathname;
   let tempSubmittedAt = 0;
   let navigateToExistingChat = false;
@@ -70,20 +74,51 @@
   }
   function notify(message) { setStatus(message); }
   function currentRoute() { return C.conversationId(location.pathname); }
+  function projectLandingId(pathname = location.pathname) {
+    return String(pathname).match(/^\/g\/(g-p-[a-zA-Z0-9_-]+)\/project\/?$/)?.[1] || null;
+  }
   function isNewChatPage() {
-    return ['/', '/new'].includes(location.pathname) || /^\/g\/g-[a-zA-Z0-9_-]+\/?$/.test(location.pathname);
+    return ['/', '/new'].includes(location.pathname) ||
+      /^\/g\/g-[a-zA-Z0-9_-]+\/?$/.test(location.pathname) ||
+      Boolean(projectLandingId());
+  }
+  function temporaryStorageKey() {
+    const projectId = projectLandingId();
+    return projectId ? TEMP_SESSION_KEY + '_project_' + projectId : TEMP_SESSION_KEY;
   }
   function getTemporaryRoute() {
+    const key = temporaryStorageKey();
     let token;
-    try { token = sessionStorage.getItem(TEMP_SESSION_KEY); } catch (_) { /* ignored */ }
-    if (!token || !/^new:[a-zA-Z0-9_-]+$/.test(token)) {
-      token = 'new:' + PAGE_ID.replace(/[^a-zA-Z0-9_-]/g, '');
-      try { sessionStorage.setItem(TEMP_SESSION_KEY, token); } catch (_) { /* ignored */ }
+    try { token = sessionStorage.getItem(key); } catch (_) { /* in-memory fallback */ }
+    if (!/^new:[a-zA-Z0-9_-]+$/.test(token || '')) {
+      token = temporaryRouteCache.get(key);
+      if (!/^new:[a-zA-Z0-9_-]+$/.test(token || '')) {
+        const identifier = key === TEMP_SESSION_KEY ? PAGE_ID : C.newQueueItem('runtime').id;
+        token = 'new:' + identifier.replace(/[^a-zA-Z0-9_-]/g, '');
+      }
+      try { sessionStorage.setItem(key, token); } catch (_) { /* in-memory fallback */ }
     }
+    const previous = temporaryRouteCache.get(key);
+    if (previous && previous !== token) temporaryRouteKeys.delete(previous);
+    temporaryRouteCache.set(key, token);
+    temporaryRouteKeys.set(token, key);
     return token;
   }
-  function forgetTemporaryRoute() {
-    try { sessionStorage.removeItem(TEMP_SESSION_KEY); } catch (_) { /* ignored */ }
+  function forgetTemporaryRoute(source) {
+    const key = temporaryRouteKeys.get(source);
+    if (!key) return;
+    try {
+      if (sessionStorage.getItem(key) === source) sessionStorage.removeItem(key);
+    } catch (_) { /* ignored */ }
+    if (temporaryRouteCache.get(key) === source) temporaryRouteCache.delete(key);
+    temporaryRouteKeys.delete(source);
+  }
+  function isUsableRoute(route) {
+    if (typeof route !== 'string') return false;
+    const stable = currentRoute();
+    if (route.startsWith('chat:')) return stable === route;
+    return route.startsWith('new:') && !stable && isNewChatPage() &&
+      getTemporaryRoute() === route;
   }
   function makeOperationId() { return crypto.randomUUID ? crypto.randomUUID() : C.newQueueItem('op').id; }
   async function rpc(command, fields = {}, operationId) {
@@ -141,7 +176,7 @@
       notify('The chat queue is not ready. Reload or try again.'); return;
     }
     const route = state.route;
-    if (!(route?.startsWith('chat:') || (route?.startsWith('new:') && isNewChatPage()))) {
+    if (!isUsableRoute(route)) {
       notify('Open a ChatGPT conversation or New Chat page before loading.'); return;
     }
     const handoff = newChatHandoff;
@@ -190,19 +225,28 @@
     return acquired;
   }
   async function loadRoute(route, { migrateFrom = null } = {}) {
+    const generation = ++routeLoadGeneration;
     state.routeLoading = true;
     try {
       const record = migrateFrom
         ? await rpc('moveTemp', { source: migrateFrom, destination: route }, makeOperationId())
         : await rpc('getQueue', { route });
-      if (state.route !== route) return;
+      // The migration may finish after another navigation. Clear only its source
+      // identifier once the coordinator confirms the move, never the new page's.
+      if (migrateFrom) forgetTemporaryRoute(migrateFrom);
+      if (generation !== routeLoadGeneration || state.route !== route) return;
       applyQueue(route, record);
       state.editingQueueId = null;
-      if (migrateFrom) forgetTemporaryRoute();
     } catch (_) {
+      if (generation !== routeLoadGeneration || state.route !== route) return;
       setStatus('Could not load saved queue.');
       state.storageHealthy = false;
-    } finally { state.routeLoading = false; renderHeader(); }
+    } finally {
+      if (generation === routeLoadGeneration) {
+        state.routeLoading = false;
+        renderHeader();
+      }
+    }
   }
   function checkRoute() {
     lastPathname = location.pathname;
@@ -227,7 +271,6 @@
     setStatus(expectedHandoff ? 'New chat created — verifying first prompt…' :
       migrateFrom ? 'New chat saved — review queue before resuming.' : 'Paused');
     loadRoute(route, { migrateFrom });
-    if (stable && !migrateFrom && (!previous || !previous.startsWith('new:'))) forgetTemporaryRoute();
   }
 
   function makeElement(tag, className, textValue) {
@@ -444,8 +487,7 @@
     root.querySelector('[data-action="tab-queue"]').classList.toggle('qfc-active', state.tab === 'queue');
     root.querySelector('[data-action="tab-workflows"]').classList.toggle('qfc-active', state.tab === 'workflows');
     const btn = root.querySelector('#qfc-start');
-    const canStart = state.route?.startsWith('chat:') ||
-      (state.route?.startsWith('new:') && isNewChatPage());
+    const canStart = isUsableRoute(state.route);
     btn.disabled = state.running || state.routeLoading || !state.storageHealthy || !state.queue.length || !canStart;
     root.querySelector('#qfc-pause').disabled = !state.running;
     statusLine.textContent = state.route?.startsWith('new:') && !state.running && state.status === 'Paused'
@@ -502,9 +544,12 @@
       const actions = makeElement('div', 'qfc-row qfc-item-actions');
       if (item.status === 'pending') {
         actions.append(actionButton('↑', 'up', item.id, 'Move up'), actionButton('↓', 'down', item.id, 'Move down'),
-          actionButton('Edit', 'edit', item.id, 'Edit queued prompt'), actionButton('×', 'remove', item.id, 'Remove queued prompt'));
+          actionButton('Edit', 'edit', item.id, 'Edit queued prompt'),
+          actionButton('Copy', 'copy', item.id, 'Copy full queued prompt'),
+          actionButton('×', 'remove', item.id, 'Remove queued prompt'));
       } else {
-        actions.append(actionButton('✓ Done', 'confirm-done', item.id, 'Confirm completed and remove from queue'),
+        actions.append(actionButton('Copy', 'copy', item.id, 'Copy full queued prompt'),
+          actionButton('✓ Done', 'confirm-done', item.id, 'Confirm completed and remove from queue'),
           actionButton('↺ Retry', 'confirm-retry', item.id, 'Confirm retry; may cause a duplicate send'));
       }
       row.append(meta, title, actions);
@@ -589,6 +634,7 @@
   async function onPanelClick(event) {
     const button = event.target.closest('button[data-action]');
     if (!button) return;
+    if (location.pathname !== lastPathname) checkRoute();
     const action = button.dataset.action, id = button.dataset.id;
     const queueItem = state.queue.find(item => item.id === id);
     const workflow = state.workflows.find(item => item.id === id);
@@ -640,6 +686,29 @@
       case 'remove':
         if (!queueItem || queueItem.status !== 'pending' || state.running) { notify('Pause before removing.'); break; }
         await editWithLock(() => queueOp('remove', { id })); render(); break;
+      case 'copy':
+        if (!queueItem) break;
+        try {
+          if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable.');
+          await navigator.clipboard.writeText(queueItem.text);
+          if (button.isConnected) {
+            button.textContent = '✓ Copied';
+            button.setAttribute('aria-label', 'Prompt copied');
+          }
+        } catch (_) {
+          if (button.isConnected) {
+            button.textContent = 'Copy failed';
+            button.setAttribute('aria-label', 'Could not copy prompt');
+          }
+        }
+        // Clipboard feedback is local to the button, never the running queue status.
+        setTimeout(() => {
+          if (button.isConnected) {
+            button.textContent = 'Copy';
+            button.setAttribute('aria-label', 'Copy full queued prompt');
+          }
+        }, 1600);
+        break;
       case 'save-queue-workflow': {
         const nameInput = root.querySelector('#qfc-workflow-name');
         if (!C.validWorkflowName(nameInput.value)) { notify('Enter a workflow name (1–100 characters).'); break; }
@@ -832,8 +901,7 @@
     return document.execCommand('insertText', false, text);
   }
   function healthyRoute(route) {
-    return state.running && state.route === route &&
-      (route.startsWith('new:') ? !currentRoute() && isNewChatPage() : currentRoute() === route);
+    return state.running && state.route === route && isUsableRoute(route);
   }
   async function waitForComposerIdle(route, deadline) {
     while (healthyRoute(route) && Date.now() < deadline) {
@@ -1096,7 +1164,7 @@
     }
     if (!workflowId && !state.queue.length) return;
     const route = state.route;
-    if (!(route?.startsWith('chat:') || (route?.startsWith('new:') && isNewChatPage()))) {
+    if (!isUsableRoute(route)) {
       notify('Open a ChatGPT conversation or New Chat page before starting.'); return;
     }
     const workflow = workflowId ? state.workflows.find(w => w.id === workflowId) : null;

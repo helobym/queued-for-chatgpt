@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.4 — Reliable Sending
+# Queued for ChatGPT v1.2.5 — Project Workflows and Copy
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.4](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.4)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.5](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.5)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.5:** ChatGPT Project landing pages now support **+ Load**, **▶ Start Workflow**, and normal Queue Start. Temporary queue identifiers are separated between Projects, and queued prompts have a **Copy** button (including sending and awaiting-response prompts). No new permissions or queue data migration required.
 
 **New in v1.2.4:** Send verification now checks for a genuinely new user turn before moving an item to Awaiting response. An ignored Send click, a re-rendered historical message, or a matching unsent composer draft is no longer treated as confirmed submission. The Send control is selected more carefully. Existing queue/workflow storage and safety recovery remain compatible.
 
@@ -16,13 +18,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.4 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.4), expand **Assets**, and download **`queued-for-chatgpt-v1.2.4.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.5 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.5), expand **Assets**, and download **`queued-for-chatgpt-v1.2.5.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.4**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.5**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -31,15 +33,24 @@ Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Ins
 
 ## Screenshots
 
-Both screenshots below are **illustrative v1.2.4 interface mockups** showing the compact Recent Activity strip shared by Queue and Workflows. They are not live ChatGPT captures and contain no real conversation data. Older screenshots remain in `screenshots/` for reference.
+Both screenshots below are **illustrative v1.2.5 interface mockups** showing the compact Recent Activity strip shared by Queue and Workflows. They are not live ChatGPT captures and contain no real conversation data. Older screenshots remain in `screenshots/` for reference.
 
 ### Queue
 
-![Queued for ChatGPT v1.2.4 — Queue panel with Current and Previous activity](screenshots/queue-v1.2.4.svg)
+![Queued for ChatGPT v1.2.5 — Queue panel with Current, Previous and Copy actions](screenshots/queue-v1.2.5.svg)
 
 ### Saved Queue Workflows
 
-![Queued for ChatGPT v1.2.4 — Workflows with Recent Activity and Start/Load buttons](screenshots/workflows-v1.2.4.svg)
+![Queued for ChatGPT v1.2.5 — Workflows with Recent Activity and Start/Load buttons](screenshots/workflows-v1.2.5.svg)
+
+## What changed in v1.2.5
+
+- Recognizes ChatGPT Project landing pages (`/g/g-p-…/project`) as supported New Chat contexts for workflow loading and sequential starts.
+- Isolates session-scoped temporary queues by Project, preserving pending work when navigating between Projects and migrating only the source queue after the first confirmed send.
+- Revalidates routes before editing or sending, and prevents older asynchronous queue loads from resetting the current page's load state.
+- Adds **Copy** on every queued prompt, including sending and awaiting-response items; copies full text without changing queue status or interrupting a workflow.
+- Adds simulated-browser coverage for Project navigation, persistence, first-send migration and clipboard failures, plus v1.2.5 ZIP and SHA-256 release packaging.
+- Retains the existing storage schema, Web Locks, conservative send and response verification, Saved Workflows, and permissions.
 
 ## What changed in v1.2.4
 
@@ -84,7 +95,7 @@ Both screenshots below are **illustrative v1.2.4 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.4.zip`** from the [v1.2.4 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.4) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.5.zip`** from the [v1.2.5 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.5) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs to load the new content script.
@@ -92,6 +103,8 @@ Unpacked extensions **do not update automatically from GitHub**.
 Changing the extension's ID (for example, by installing from a different folder) can make your old locally stored queues and workflows inaccessible to the new copy. Export backups before upgrading, and check uncertain sends manually to avoid duplicates.
 
 ## How to use Load Workflow
+
+On a ChatGPT Project landing page (`/g/g-p-…/project`), **+ Load** and **▶ Start Workflow** are available just as on ordinary New Chat. Each Project keeps its own pending temporary queue in that browser tab until ChatGPT creates a conversation.
 
 1. Open **Workflows** and find the saved workflow you want.
 2. Click **+ Load**. All its steps append after the current queued prompts, preserving their order.
@@ -104,7 +117,7 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 
 ## How to use Start Workflow
 
-1. Open a fresh ChatGPT **New Chat** or an existing conversation.
+1. Open a fresh ChatGPT **New Chat**, a **Project landing page**, or an existing conversation.
 2. Open the movable **☷ Queue** floating panel, then the **☷ Workflows** tab.
 3. Create or select a saved workflow containing at least one prompt.
 4. Click **▶ Start Workflow**. The view changes to **Queue** and begins automatic sequential sending.
@@ -113,6 +126,10 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 **If queued items already exist**, confirm the dialog to send those **before** the saved workflow steps, or cancel and manage the existing queue first. The extension does not silently clear, replace, or reorder existing prompts.
 
 **If the current queue is running**, pause it before clicking a different Start Workflow. If another tab/window is already processing the same chat, the start attempt will be refused without appending. Different conversations may still have independent queues.
+
+## Copy a queued prompt
+
+On the **Queue** tab, click **Copy** next to any pending, sending or awaiting-response prompt. The complete prompt text, including internal line breaks, is copied to your clipboard even when its preview is truncated. Success or failure appears briefly on the button; Copy does not edit, pause, remove or submit the prompt. The action writes to the system clipboard only after you click it.
 
 ## Existing features retained
 
@@ -140,6 +157,8 @@ Playwright (installed Chromium, simulated page):
 - `tests/smoke_workflows.py` — create/edit then directly start a saved workflow in an existing chat.
 - `tests/smoke_workflow_load_during_run.py` — Load while idle does not send; Load while running appends after existing prompts and the active runner processes the new steps.
 - `tests/smoke_workflow_new_chat.py` — directly start workflow on New Chat.
+- `tests/smoke_project_workflows.py` — Project Load/Start, first-send migration, cross-Project isolation and reload persistence.
+- `tests/smoke_queue_copy.py` — complete-text Copy across queue states and clipboard failure handling.
 - `tests/smoke_workflow_direct_start_safety.py` — three safety cases: existing queue approval, lock refusal, uncertain item.
 - `tests/smoke_browser.py`, `tests/smoke_new_chat.py`, `tests/smoke_app_shell.py`, `tests/smoke_draggable_panel.py` — regression scenarios.
 - `tests/smoke_app_shell_uncertain.py`, `tests/smoke_first_reply_uncertain.py` — two uncertainty safeguards.

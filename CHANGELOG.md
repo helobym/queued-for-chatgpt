@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.5 (2026-11-06)
+
+- Enabled + Load, Start Workflow and ordinary Queue Start on supported ChatGPT Project landing pages.
+- Separated temporary queue identifiers per Project while preserving existing New Chat queues and first-send migration.
+- Strengthened route validation during navigation and prevented stale asynchronous route loads from resetting the active page state.
+- Added a Copy button to each pending, sending and awaiting-response prompt, copying the full text without changing queue or sending state.
+- Added simulated Chromium regression tests for Project routing, queue isolation, first-send handoff and clipboard behavior.
+- Updated the v1.2.5 GitHub release ZIP, checksum, installation guidance and illustrative screenshots.
+- Live ChatGPT Project composer compatibility and Chromebook resource use remain to be verified.
+
 ## 1.2.4 (2026-11-06)
 
 - Improved active Send-button selection and readiness checks.
