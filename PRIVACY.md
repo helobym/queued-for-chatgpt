@@ -7,7 +7,7 @@ Queued for ChatGPT is a browser extension that helps users save prompt workflows
 
 ## What the extension stores
 
-The extension stores queued prompts, saved workflows, queue status, conversation identifiers, and interface preferences in Chrome's local extension storage. It also keeps one short preview (up to 160 characters) of the most recently confirmed completed queued prompt per conversation, plus its completion time and workflow origin when available. This is not a full prompt or response history. It may also keep temporary chat identifiers and the floating panel position in the tab's session storage. Older versions' Favorites data may remain locally for backup.
+The extension stores queued prompts, saved workflows, queue status, conversation identifiers, and interface preferences in Chrome's local extension storage. It also keeps one short preview (up to 160 characters) of the most recently confirmed completed queued prompt per conversation, plus its completion time and workflow origin when available. This is not a full prompt or response history. It may also keep temporary chat identifiers and the floating panel position in the tab's session storage. Workflow expansion and the local dock-running indicator are kept only in the current page's memory and are not added to saved queue records. Older versions' Favorites data may remain locally for backup.
 
 This information stays in your browser profile. **Helobym Networking does not operate a server that receives it.** The extension does not use advertising trackers, analytics, or telemetry.
 
@@ -15,7 +15,7 @@ This information stays in your browser profile. **Helobym Networking does not op
 
 When you click **Start** or **Start Workflow**, the extension submits your selected prompts to ChatGPT through the ChatGPT website. The **+ Load** button only appends prompts to the local queue and does not start a stopped queue; if that queue is already running, its existing sender will eventually submit the newly loaded prompts automatically. It also reads relevant ChatGPT page elements to check whether messages were sent and responses have finished.
 
-Clicking **Copy** on a queued prompt places that prompt's full text on your device's clipboard. Copy does not send the prompt to ChatGPT or to Helobym Networking. Clipboard contents may be accessible to other applications on your device.
+Clicking **Copy** on a queued prompt or an individual saved workflow step places that prompt's full text on your device's clipboard. Copy does not send the prompt to ChatGPT or to Helobym Networking. Clipboard contents may be accessible to other applications on your device.
 
 Prompt content submitted to ChatGPT is processed by OpenAI under its own terms and privacy policy. Helobym Networking does not control how OpenAI processes that content.
 
