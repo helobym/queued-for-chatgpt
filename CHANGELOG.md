@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.6 (2026-11-06)
+
+- Added live status and remaining-pending count to the floating Queue dock; excludes the currently active prompt while displaying Running.
+- Added conservative Starting, Loading, Check status and Unavailable states so sender-lock refusal, remote tabs and route changes do not falsely display Running or Idle.
+- Added collapsed-by-default Saved Workflows with numbered, individually copyable full prompt steps.
+- Reused existing clipboard feedback and preserved workflow expansion across queue status changes without unnecessary list re-renders.
+- Added targeted simulated browser coverage for status transitions, workflow display and copying, Project navigation, sender-lock refusal and draggable-panel layout.
+- Kept the current queue/coordinator storage schema, permissions and conservative response verification unchanged.
+- Updated the v1.2.6 release workflow, installation package, checksum, upgrade documentation and illustrative UI mockups.
+- Live ChatGPT account compatibility and Chromebook resource usage remain to be verified.
+
+
 ## 1.2.5 (2026-11-06)
 
 - Enabled + Load, Start Workflow and ordinary Queue Start on supported ChatGPT Project landing pages.
