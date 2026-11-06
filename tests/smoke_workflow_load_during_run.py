@@ -53,18 +53,24 @@ with sync_playwright() as p:
         page.locator('#qfc-compose').fill(prompt)
         page.locator('#qfc-add').click()
         page.locator('#qfc-queue-items').get_by_text(prompt).wait_for()
+    assert page.locator('.qfc-dock').get_attribute('data-phase') == 'paused'
+    assert '2 pending' in page.locator('#qfc-dock-count').inner_text()
     page.locator('#qfc-start').click()
     page.wait_for_function(
         "document.querySelectorAll('[data-message-author-role=\"user\"]').length === 2",
         timeout=15000
     )
     assert page.locator('#qfc-pause').is_enabled()
+    assert page.locator('.qfc-dock').get_attribute('data-phase') == 'running'
+    assert '1 left' in page.locator('#qfc-dock-count').inner_text()
 
     # Append during the active first response. Its runner must pick up the new tail.
     page.locator('[data-action="tab-workflows"]').click()
     page.locator('[data-action="load-workflow"]').click()
     page.locator('#qfc-queue-items').get_by_text('Workflow second').wait_for()
     assert page.locator('#qfc-pause').is_enabled()
+    assert page.locator('.qfc-dock').get_attribute('data-phase') == 'running'
+    assert 'left' in page.locator('#qfc-dock-count').inner_text()
     page.wait_for_function(
         "document.querySelector('#qfc-status').textContent.includes('Queue complete')",
         timeout=60000
@@ -72,6 +78,7 @@ with sync_playwright() as p:
     sent = page.locator('[data-message-author-role="user"] .whitespace-pre-wrap').all_inner_texts()
     assert sent[-4:] == ['Existing first', 'Existing second', 'Workflow first', 'Workflow second'], sent
     assert page.locator('#qfc-count').inner_text() == '0'
+    assert page.locator('.qfc-dock').get_attribute('data-phase') == 'idle'
     assert page.locator('#qfc-activity-current').is_hidden()
     previous = page.locator('#qfc-activity-previous').inner_text()
     assert 'Workflow second' in previous and 'Step 2/2' in previous, previous
