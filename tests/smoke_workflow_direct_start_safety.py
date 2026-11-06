@@ -76,6 +76,7 @@ with sync_playwright() as p:
     page.locator('[data-action="start-workflow"]').click()
     page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Another tab is controlling')")
     assert page.locator('#qfc-count').inner_text() == '0'
+    assert page.locator('.qfc-dock').get_attribute('data-phase') == 'idle'
     assert page.locator('[data-message-author-role="user"]').count() == 1
     print('PASS: unavailable sender lock does not append workflow or send prompts')
     page.close()
@@ -95,6 +96,7 @@ with sync_playwright() as p:
     page.locator('[data-action="start-workflow"]').click()
     page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Review uncertain queued prompts')")
     assert page.locator('#qfc-count').inner_text() == '1'
+    assert page.locator('.qfc-dock').get_attribute('data-phase') == 'check'
     assert page.locator('[data-message-author-role="user"]').count() == 1
     print('PASS: uncertain in-flight prompt prevents workflow append and auto-send')
     browser.close()
