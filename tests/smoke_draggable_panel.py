@@ -33,6 +33,11 @@ def attach(page, persisted=None):
 
 
 def inside_viewport(page):
+    dock = page.locator('.qfc-dock').bounding_box()
+    width, height = page.evaluate('[innerWidth, innerHeight]')
+    assert dock['x'] >= 7 and dock['y'] >= 7, dock
+    assert dock['x'] + dock['width'] <= width - 7, dock
+    assert dock['y'] + dock['height'] <= height - 7, dock
     rect = page.locator('#qfc-panel').bounding_box()
     width, height = page.evaluate('[innerWidth, innerHeight]')
     assert rect['x'] >= 7 and rect['y'] >= 7, rect
@@ -67,6 +72,8 @@ with sync_playwright() as p:
     # Closing and opening retains position and works with the existing Queue button.
     page.locator('.qfc-head-actions [data-action="toggle"]').click()
     assert page.locator('#qfc-panel').is_hidden()
+    # The dock changes its own width as status/count change while collapsed.
+    page.locator('.qfc-dock').bounding_box()
     page.locator('.qfc-dock').click()
     again = inside_viewport(page)
     assert abs(again['x']-moved['x']) <= 2 and abs(again['y']-moved['y']) <= 2, (moved,again)
