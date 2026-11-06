@@ -49,6 +49,7 @@ jobs:
           assert "case 'copy':" in Path('content.js').read_text(encoding='utf-8')
           assert "case 'copy-workflow-step':" in Path('content.js').read_text(encoding='utf-8')
           assert "function dockDisplay()" in Path('content.js').read_text(encoding='utf-8')
+          assert "state.senderLockRoute = route;" in Path('content.js').read_text(encoding='utf-8')
           assert "qfc-workflow-details" in Path('content.js').read_text(encoding='utf-8')
           PY
 
