@@ -39,7 +39,14 @@ with sync_playwright() as p:
     page.locator('#qfc-step-1').fill('Give five conclusions')
     page.locator('[data-action="save-workflow-edit"]').click()
     page.locator('#qfc-workflow-items').get_by_text('Research and report').wait_for()
-    page.locator('#qfc-workflow-items').get_by_text('Give five conclusions').wait_for()
+    assert page.locator('.qfc-workflow-details').is_hidden()
+    page.locator('[data-action="toggle-workflow"]').click()
+    page.locator('.qfc-workflow-prompt-text').get_by_text('Give five conclusions').wait_for()
+    assert page.locator('[data-action="toggle-workflow"]').get_attribute('aria-expanded') == 'true'
+    assert page.locator('[data-action="copy-workflow-step"]').count() == 2
+    page.locator('[data-action="toggle-workflow"]').click()
+    assert page.locator('.qfc-workflow-details').is_hidden()
+    assert page.locator('[data-action="toggle-workflow"]').get_attribute('aria-expanded') == 'false'
     # Verify existing queued work was untouched, then load the saved workflow.
     page.locator('[data-action="tab-queue"]').click()
     assert page.locator('#qfc-count').inner_text() == '2'
