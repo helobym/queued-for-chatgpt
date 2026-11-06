@@ -1,12 +1,18 @@
-QUEUED FOR CHATGPT — v1.2.4 to v1.2.5
+QUEUED FOR CHATGPT — v1.2.5 to v1.2.6
 
 [ ] Export important Saved Queue Workflows as a JSON backup before upgrading.
 [ ] Let any running prompts finish or pause the queue. Review uncertain in-flight items.
 [ ] Keep the existing unpacked extension directory and extension ID.
-[ ] Download queued-for-chatgpt-v1.2.5.zip from the GitHub v1.2.5 Release (Assets).
+[ ] Download queued-for-chatgpt-v1.2.6.zip from the GitHub v1.2.6 Release (Assets).
 [ ] Extract it, then replace the extension files in that SAME directory.
-[ ] In chrome://extensions, press Reload and confirm version 1.2.5.
+[ ] In chrome://extensions, press Reload and confirm version 1.2.6.
 [ ] Refresh all open ChatGPT tabs/windows (the old content script must be replaced).
+[ ] When three prompts are queued but stopped, confirm the dock displays "Paused · 3 pending".
+[ ] Start the queue and verify the dock shows "Running" with the count excluding the active prompt.
+[ ] Confirm the dock returns to Idle after the final response completes.
+[ ] In Workflows, verify saved workflows are collapsed by default and Expand/Collapse works independently.
+[ ] Expand a workflow, Copy individual full-length steps, and verify Copy doesn't start or change the queue.
+[ ] Keep an expanded workflow visible during an active queue and confirm it stays expanded.
 [ ] In Workflows, verify both "▶ Start Workflow" and "+ Load" appear.
 [ ] On a Project landing page, confirm + Load appends without sending and Start Workflow sends after explicit approval.
 [ ] Switch between two Project landing pages and confirm their pending queues stay separate.
