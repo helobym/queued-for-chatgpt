@@ -86,5 +86,35 @@ with sync_playwright() as playwright:
     page.wait_for_function(
         "document.querySelector('[data-action=copy]').textContent.includes('failed')")
     assert snapshot() == before
-    print('PASS: full prompt Copy for all queue states and graceful clipboard errors')
+    # Saved workflow steps reuse the same clipboard path, with no queue mutation.
+    page.evaluate("""() => {
+      Object.defineProperty(navigator, 'clipboard', {configurable:true,
+        value:{writeText: async text => {window.copied.push(text);}}});
+    }""")
+    page.locator('[data-action="tab-workflows"]').click()
+    page.locator('[data-action="new-workflow"]').click()
+    page.locator('#qfc-edit-workflow-name').fill('Clipboard workflow')
+    page.locator('#qfc-step-0').fill(prompt)
+    page.locator('[data-action="add-workflow-step"]').click()
+    page.locator('#qfc-step-1').fill('Different second prompt')
+    page.locator('[data-action="save-workflow-edit"]').click()
+    page.locator('#qfc-workflow-items').get_by_text('Clipboard workflow').wait_for()
+    assert page.locator('.qfc-workflow-details').is_hidden()
+    page.locator('[data-action="toggle-workflow"]').click()
+    page.locator('[data-action="copy-workflow-step"]').nth(0).click()
+    page.wait_for_function(
+        "document.querySelector('[data-action=copy-workflow-step]').textContent.includes('Copied')")
+    assert page.evaluate('window.copied.at(-1)') == prompt
+    page.locator('[data-action="copy-workflow-step"]').nth(1).click()
+    assert page.evaluate('window.copied.at(-1)') == 'Different second prompt'
+    queue_before, workflows_before = snapshot(), page.evaluate("""async () =>
+      (await chrome.runtime.sendMessage({app:'qfc-v1.1',command:'getWorkflows'})).data""")
+    page.evaluate("navigator.clipboard.writeText = async () => {throw new Error('NotAllowedError');};")
+    page.locator('[data-action="copy-workflow-step"]').nth(0).click()
+    page.wait_for_function(
+      "document.querySelector('[data-action=copy-workflow-step]').textContent.includes('failed')")
+    assert snapshot() == queue_before
+    assert page.evaluate("""async () =>
+      (await chrome.runtime.sendMessage({app:'qfc-v1.1',command:'getWorkflows'})).data""") == workflows_before
+    print('PASS: full queue and workflow prompt Copy; queue states, unchanged storage and clipboard failures')
     browser.close()
