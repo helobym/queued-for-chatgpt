@@ -109,7 +109,9 @@ with sync_playwright() as playwright:
     assert page.evaluate('window.copied.at(-1)') == 'Different second prompt'
     queue_before, workflows_before = snapshot(), page.evaluate("""async () =>
       (await chrome.runtime.sendMessage({app:'qfc-v1.1',command:'getWorkflows'})).data""")
-    page.evaluate("navigator.clipboard.writeText = async () => {throw new Error('NotAllowedError');};")
+    page.evaluate("""() => {
+      navigator.clipboard.writeText = async () => {throw new Error('NotAllowedError');};
+    }""")
     page.locator('[data-action="copy-workflow-step"]').nth(0).click()
     page.wait_for_function(
       "document.querySelector('[data-action=copy-workflow-step]').textContent.includes('failed')")
