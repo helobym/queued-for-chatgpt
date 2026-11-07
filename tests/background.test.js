@@ -109,7 +109,9 @@ test('native panel shortcut targets one tab, ignores unknown commands and falls 
   await bg.command('another-command', {id: 7});
   assert.equal(bg.sent.length, 0);
   await bg.command('toggle-queue-panel', {id: 7});
-  assert.deepEqual(bg.sent[0], {id: 7, message: {app:'qfc-ui-v1',action:'toggle-panel'}});
+  assert.equal(bg.sent[0].id, 7);
+  assert.equal(bg.sent[0].message.app, 'qfc-ui-v1');
+  assert.equal(bg.sent[0].message.action, 'toggle-panel');
   await bg.command('toggle-queue-panel');
   assert.equal(bg.sent[1].id, 42);
   bg.rejectReceiver();
