@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.9 (2026-11-07)
+
+- Moved the Saved Workflow Expand/Collapse action to a compact, accessible chevron at the left of each workflow name.
+- Added a compact Notification Settings view in the floating window with Back navigation and retained Queue/Workflows state.
+- Added persistent, cross-tab preferences for desktop notifications, verified success, automatic interruption, sound, custom sound duration and popup visibility.
+- Added three original, locally generated Web Audio tones with optional once/5/10/20-second bounded playback and a Test Sound action.
+- Used Chrome's Offscreen API only for optional sound; no always-running audio page, new backend, external assets, telemetry or additional queue polling.
+- Preserved all v1.2.8 run-ID deduplication, sender ownership, manual Pause silence and conservative receipt/response checks.
+- Expanded unit and simulated Chromium tests; added `offscreen` permission and audio files to the release package.
+- Chrome/OS may suppress notifications or audio; `requireInteraction` is best effort and does not provide exact banner timeout control.
+
 ## 1.2.8 (2026-11-07)
 
 - Added native Chrome desktop notifications for a successfully verified full run and for unexpected automatic pauses requiring manual review.

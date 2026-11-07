@@ -7,6 +7,23 @@
   const MAX_QUEUE = 100;
   const FAV_KEY = 'qfc_v2_favorites';
   const SETTINGS_KEY = 'qfc_v1_settings';
+  const NOTIFICATION_SETTINGS_KEY = 'qfc_v1_notification_settings';
+  const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({
+    enabled: true, onSuccess: true, onInterrupted: true,
+    sound: 'system', soundDuration: 'once', visibility: 'system'
+  });
+  function cleanNotificationSettings(input) {
+    const value = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    const defaults = DEFAULT_NOTIFICATION_SETTINGS;
+    return {
+      enabled: typeof value.enabled === 'boolean' ? value.enabled : defaults.enabled,
+      onSuccess: typeof value.onSuccess === 'boolean' ? value.onSuccess : defaults.onSuccess,
+      onInterrupted: typeof value.onInterrupted === 'boolean' ? value.onInterrupted : defaults.onInterrupted,
+      sound: ['system', 'soft', 'double', 'alert', 'silent'].includes(value.sound) ? value.sound : defaults.sound,
+      soundDuration: ['once', '5', '10', '20'].includes(value.soundDuration) ? value.soundDuration : defaults.soundDuration,
+      visibility: ['system', 'persistent'].includes(value.visibility) ? value.visibility : defaults.visibility
+    };
+  }
   const WORKFLOWS_KEY = 'qfc_v3_workflows';
   const MAX_WORKFLOWS = 200;
   const MAX_WORKFLOW_CHARS = 150000;
@@ -171,6 +188,7 @@
     return result;
   }
   const api = { VERSION, MAX_PROMPT_LENGTH, MAX_FAVORITES, MAX_QUEUE, FAV_KEY, SETTINGS_KEY,
+    NOTIFICATION_SETTINGS_KEY, DEFAULT_NOTIFICATION_SETTINGS, cleanNotificationSettings,
     WORKFLOWS_KEY, MAX_WORKFLOWS, MAX_WORKFLOW_CHARS, MAX_WORKFLOWS_TOTAL_CHARS, MAX_ACTIVITY_PREVIEW,
     validWorkflowName, cleanWorkflowSteps, cleanWorkflows, cleanWorkflowOrigin, cleanLastCompleted,
     normalize, validText, conversationId, queueKey, newQueueItem, cleanQueue,

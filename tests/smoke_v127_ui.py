@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = json.loads((ROOT / 'manifest.json').read_text(encoding='utf-8'))
-assert MANIFEST['version'] in ('1.2.7', '1.2.8')
+assert MANIFEST['version'] in ('1.2.7', '1.2.8', '1.2.9')
 assert MANIFEST['commands']['toggle-queue-panel']['suggested_key']['default'] == 'Alt+Shift+Q'
 
 with sync_playwright() as playwright:
@@ -54,7 +54,10 @@ with sync_playwright() as playwright:
     page.locator('[data-action="add-workflow-step"]').click()
     page.locator('#qfc-step-1').fill('Workflow second step')
     page.locator('[data-action="save-workflow-edit"]').click()
-    page.locator('[data-action="toggle-workflow"]').click()
+    toggle = page.locator('[data-action="toggle-workflow"]')
+    assert toggle.locator('xpath=..').get_attribute('class').find('qfc-workflow-heading') >= 0
+    assert toggle.get_attribute('aria-label') == 'Expand saved workflow prompts'
+    toggle.click()
     assert page.locator('[data-action="toggle-workflow"]').get_attribute('aria-expanded') == 'true'
     page.locator('[data-action="load-workflow"]').click()
     page.wait_for_function("document.querySelector('#qfc-count').textContent === '2'")

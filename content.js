@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.8 — verified completion and interruption notifications. */
+/* Queued for ChatGPT v1.2.9 — compact workflows and configurable notification alerts. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -61,6 +61,10 @@
   let lastQueueRenderKey = null;
   // View-only disclosure: do not persist prompt details or introduce new storage keys.
   let activityExpanded = false;
+  // Settings is a view within the floating window, not a new browser tab.
+  // Saved workflow expansion and selected Queue/Workflows tab remain untouched.
+  let settingsOpen = false;
+  let notificationSettings = C.cleanNotificationSettings();
   // Page-local execution session. Never persist full prompts or responses.
   let activeRun = null;
   function runEvent(run, action, reason = 'unexpected') {
@@ -342,6 +346,7 @@
             <small>Drag here to move · local · lightweight</small>
           </div>
           <div class="qfc-head-actions">
+            <button type="button" class="qfc-small" data-action="open-settings" title="Notification settings" aria-label="Notification settings" aria-pressed="false">⚙</button>
             <button type="button" class="qfc-small" data-action="reset-position" title="Reset panel position" aria-label="Reset panel position">⌖</button>
             <button type="button" class="qfc-small" data-action="toggle" title="Close panel" aria-label="Close panel">✕</button>
           </div>
@@ -406,6 +411,44 @@
             <input type="file" id="qfc-import-file" accept=".json,application/json" hidden>
           </div>
         </div>
+        <div id="qfc-settings-view" class="qfc-view qfc-settings" aria-label="Notification settings" hidden>
+          <div class="qfc-settings-head">
+            <button type="button" class="qfc-small" data-action="settings-back" aria-label="Back to previous view">← Back</button>
+            <strong>Notification Settings</strong>
+          </div>
+          <label class="qfc-setting-row" for="qfc-notify-enabled">
+            <span>Desktop notifications</span><input type="checkbox" id="qfc-notify-enabled" data-notification-setting="enabled">
+          </label>
+          <label class="qfc-setting-row" for="qfc-notify-success">
+            <span>Workflow completed</span><input type="checkbox" id="qfc-notify-success" data-notification-setting="onSuccess">
+          </label>
+          <label class="qfc-setting-row" for="qfc-notify-interrupted">
+            <span>Stopped automatically</span><input type="checkbox" id="qfc-notify-interrupted" data-notification-setting="onInterrupted">
+          </label>
+          <label class="qfc-label" for="qfc-notify-sound">Notification sound</label>
+          <select id="qfc-notify-sound" data-notification-setting="sound">
+            <option value="system">System default</option>
+            <option value="soft">Soft Chime</option>
+            <option value="double">Double Chime</option>
+            <option value="alert">Alert Beep</option>
+            <option value="silent">Silent</option>
+          </select>
+          <label class="qfc-label" for="qfc-notify-duration">Custom sound duration</label>
+          <select id="qfc-notify-duration" data-notification-setting="soundDuration">
+            <option value="once">Once</option>
+            <option value="5">5 seconds</option>
+            <option value="10">10 seconds</option>
+            <option value="20">20 seconds</option>
+          </select>
+          <label class="qfc-label" for="qfc-notify-visibility">Notification visibility</label>
+          <select id="qfc-notify-visibility" data-notification-setting="visibility">
+            <option value="system">System default</option>
+            <option value="persistent">Until dismissed (where supported)</option>
+          </select>
+          <button type="button" class="qfc-small" data-action="test-notification-sound" id="qfc-test-sound">▶ Test sound</button>
+          <p class="qfc-settings-help" id="qfc-notify-permission" role="status">Checking Chrome notification permission…</p>
+          <p class="qfc-settings-help">Sound duration controls only custom audio, not how long Chrome displays a popup. System and device settings may suppress notifications and sounds.</p>
+        </div>
         <footer id="qfc-status" role="status">Paused</footer>
       </section>`;
     document.body.append(root);
@@ -417,6 +460,16 @@
     root.addEventListener('click', event => { onPanelClick(event).catch(error => notify(error.message || 'Unable to save changes.')); });
     workflowSearch.addEventListener('input', renderWorkflows);
     root.querySelector('#qfc-import-file').addEventListener('change', importFile);
+    root.addEventListener('change', event => {
+      const key = event.target.dataset?.notificationSetting;
+      if (!key || !(key in C.DEFAULT_NOTIFICATION_SETTINGS)) return;
+      const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
+      notificationSettings = C.cleanNotificationSettings({ ...notificationSettings, [key]: value });
+      renderNotificationSettings();
+      // Independent from C.SETTINGS_KEY (panel-open state) and queue storage.
+      STORAGE.set({ [C.NOTIFICATION_SETTINGS_KEY]: notificationSettings })
+        .catch(() => notify('Could not save notification settings. Check extension storage.'));
+    });
     root.addEventListener('input', event => {
       const draft = state.workflowDraft;
       if (!draft) return;
@@ -540,6 +593,33 @@
     if (pending) return { phase: 'paused', label: 'Paused', suffix: ` · ${pending} pending` };
     return { phase: 'idle', label: 'Idle', suffix: '' };
   }
+  function renderNotificationSettings() {
+    if (!root) return;
+    const values = notificationSettings;
+    for (const control of root.querySelectorAll('[data-notification-setting]')) {
+      const value = values[control.dataset.notificationSetting];
+      if (control.type === 'checkbox') control.checked = Boolean(value);
+      else control.value = value;
+      control.disabled = control.id !== 'qfc-notify-enabled' && !values.enabled;
+    }
+    const custom = ['soft', 'double', 'alert'].includes(values.sound);
+    root.querySelector('#qfc-notify-duration').disabled = !values.enabled || !custom;
+    root.querySelector('#qfc-test-sound').disabled = !values.enabled || !custom;
+  }
+  async function updateNotificationPermission() {
+    const info = root?.querySelector('#qfc-notify-permission');
+    if (!info) return;
+    try {
+      const level = await rpc('notificationPermission');
+      if (!settingsOpen) return;
+      info.textContent = level === 'granted'
+        ? 'Chrome notifications: allowed. OS settings may still mute or hide alerts.'
+        : level === 'denied' ? 'Chrome notifications: blocked. Allow them in browser settings.'
+          : 'Chrome notification permission unavailable; check browser settings.';
+    } catch (_) {
+      if (settingsOpen) info.textContent = 'Notification permission could not be checked.';
+    }
+  }
   function renderHeader() {
     if (!root) return;
     const count = state.queue.length;
@@ -558,8 +638,11 @@
     root.querySelector('#qfc-workflow-count').textContent = state.workflows.length;
     dock.setAttribute('aria-expanded', String(state.open));
     root.querySelector('#qfc-panel').hidden = !state.open;
-    root.querySelector('#qfc-queue-view').hidden = state.tab !== 'queue';
-    root.querySelector('#qfc-workflows-view').hidden = state.tab !== 'workflows';
+    root.querySelector('.qfc-nav').hidden = settingsOpen;
+    root.querySelector('#qfc-settings-view').hidden = !settingsOpen;
+    root.querySelector('[data-action="open-settings"]').setAttribute('aria-pressed', String(settingsOpen));
+    root.querySelector('#qfc-queue-view').hidden = settingsOpen || state.tab !== 'queue';
+    root.querySelector('#qfc-workflows-view').hidden = settingsOpen || state.tab !== 'workflows';
     root.querySelector('[data-action="tab-queue"]').classList.toggle('qfc-active', state.tab === 'queue');
     root.querySelector('[data-action="tab-workflows"]').classList.toggle('qfc-active', state.tab === 'workflows');
     const btn = root.querySelector('#qfc-start');
@@ -582,7 +665,7 @@
     const current = head && (head.status !== 'pending' || state.running) ? head : null;
     const previous = state.lastCompleted;
     const wasHidden = section.hidden;
-    section.hidden = !current && !previous;
+    section.hidden = settingsOpen || (!current && !previous);
     const button = root.querySelector('[data-action="toggle-activity"]');
     const details = root.querySelector('#qfc-activity-details');
     const currentStatus = !current ? '' : current.status === 'pending' ? 'Preparing' :
@@ -652,7 +735,7 @@
     lastQueueRenderKey = renderKey;
   }
   function renderWorkflows() {
-    if (!workflowsList || !state.open || state.tab !== 'workflows') return;
+    if (!workflowsList || !state.open || settingsOpen || state.tab !== 'workflows') return;
     const query = C.normalize(workflowSearch.value).toLocaleLowerCase();
     const renderKey = JSON.stringify([state.workflowsRev, query, [...expandedWorkflowIds].sort()]);
     // Queue status updates must not destroy Copy feedback, text selection or focus.
@@ -671,11 +754,15 @@
     for (const [index, workflow] of found.entries()) {
       const expanded = expandedWorkflowIds.has(workflow.id);
       const row = makeElement('div', 'qfc-item qfc-workflow-item');
-      row.append(makeElement('div', 'qfc-workflow-title', workflow.name));
-      row.append(makeElement('div', 'qfc-meta', `${workflow.steps.length} steps`));
+      const heading = makeElement('div', 'qfc-workflow-heading');
+      const titleGroup = makeElement('div', 'qfc-workflow-heading-text');
+      titleGroup.append(makeElement('div', 'qfc-workflow-title', workflow.name),
+        makeElement('div', 'qfc-meta', `${workflow.steps.length} steps`));
       const actions = makeElement('div', 'qfc-row qfc-item-actions');
-      const toggle = actionButton(expanded ? '▴ Collapse' : '▾ Expand',
+      const toggle = actionButton(expanded ? '▾' : '▸',
         'toggle-workflow', workflow.id, expanded ? 'Collapse saved workflow prompts' : 'Expand saved workflow prompts');
+      toggle.classList.add('qfc-disclosure');
+      heading.append(toggle, titleGroup);
       const details = makeElement('div', 'qfc-workflow-details');
       details.id = `qfc-workflow-details-${index}`;
       details.hidden = !expanded;
@@ -684,7 +771,7 @@
       const startButton = actionButton('▶ Start Workflow', 'start-workflow', workflow.id,
         'Add this workflow to the current conversation and immediately begin sending');
       startButton.classList.add('qfc-primary');
-      actions.append(toggle, startButton,
+      actions.append(startButton,
         actionButton('+ Load', 'load-workflow', workflow.id,
           'Append these prompts to the queue without starting it'),
         actionButton('Edit', 'edit-workflow', workflow.id, 'Edit name and steps'),
@@ -702,7 +789,7 @@
           details.append(entry);
         });
       }
-      row.append(actions, details);
+      row.append(heading, actions, details);
       frag.append(row);
     }
     workflowsList.replaceChildren(frag);
@@ -769,6 +856,7 @@
   }
   function setTab(tab) {
     state.tab = tab;
+    settingsOpen = false;
     renderHeader();
     // A hidden list may have missed several queue or workflow revisions.
     renderQueue();
@@ -817,6 +905,27 @@
         activityExpanded = !activityExpanded;
         renderActivity();
         setPanelPosition(panelOffsetX, panelOffsetY);
+        break;
+      case 'open-settings':
+        settingsOpen = !settingsOpen;
+        render();
+        renderNotificationSettings();
+        if (settingsOpen) void updateNotificationPermission();
+        setPanelPosition(panelOffsetX, panelOffsetY);
+        break;
+      case 'settings-back':
+        settingsOpen = false;
+        render();
+        setPanelPosition(panelOffsetX, panelOffsetY);
+        break;
+      case 'test-notification-sound':
+        if (!notificationSettings.enabled || !['soft', 'double', 'alert'].includes(notificationSettings.sound)) break;
+        try {
+          const result = await rpc('previewSound', {
+            sound: notificationSettings.sound, duration: notificationSettings.soundDuration
+          });
+          if (!result?.played) notify('Sound preview unavailable. Check Chrome extension permissions and audio.');
+        } catch (_) { notify('Could not play selected sound.'); }
         break;
       case 'reset-position': resetPanelPosition(); break;
       case 'tab-queue': setTab('queue'); break;
@@ -1450,10 +1559,12 @@
     initPanel();
     try {
       const [record, settings] = await Promise.all([
-        rpc('getWorkflows'), STORAGE.get(C.SETTINGS_KEY)
+        rpc('getWorkflows'), STORAGE.get([C.SETTINGS_KEY, C.NOTIFICATION_SETTINGS_KEY])
       ]);
       applyWorkflows(record);
       state.open = Boolean(settings[C.SETTINGS_KEY]?.open);
+      notificationSettings = C.cleanNotificationSettings(settings[C.NOTIFICATION_SETTINGS_KEY]);
+      renderNotificationSettings();
     } catch (_) { state.storageHealthy = false; setStatus('Could not load workflows. Reload the tab.'); }
     checkRoute();
     render();
@@ -1470,6 +1581,10 @@
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
+      if (changes[C.NOTIFICATION_SETTINGS_KEY]) {
+        notificationSettings = C.cleanNotificationSettings(changes[C.NOTIFICATION_SETTINGS_KEY].newValue);
+        renderNotificationSettings();
+      }
       if (changes[C.WORKFLOWS_KEY]) applyWorkflows(changes[C.WORKFLOWS_KEY].newValue);
       if (state.route && changes[C.queueKey(state.route)]) applyQueue(state.route, changes[C.queueKey(state.route)].newValue);
     });

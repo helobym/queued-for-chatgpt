@@ -64,3 +64,27 @@ test('workflow origin and recent activity data are validated and survive cleanin
   assert.deepEqual(snapshot.workflow, workflow);
   assert.equal(core.cleanLastCompleted({ ...snapshot, completion: 'unconfirmed' }), null);
 });
+
+test('notification settings default safely and use an independent storage key', () => {
+  assert.equal(core.NOTIFICATION_SETTINGS_KEY, 'qfc_v1_notification_settings');
+  const defaults = core.cleanNotificationSettings();
+  assert.deepEqual(defaults, {
+    enabled: true, onSuccess: true, onInterrupted: true,
+    sound: 'system', soundDuration: 'once', visibility: 'system'
+  });
+  assert.notEqual(core.NOTIFICATION_SETTINGS_KEY, core.SETTINGS_KEY);
+});
+test('notification settings clean strictly validates types and allowed options', () => {
+  assert.deepEqual(core.cleanNotificationSettings({
+    enabled: false, onSuccess: true, onInterrupted: false,
+    sound: 'alert', soundDuration: '20', visibility: 'persistent', extra: 'ignored'
+  }), {
+    enabled: false, onSuccess: true, onInterrupted: false,
+    sound: 'alert', soundDuration: '20', visibility: 'persistent'
+  });
+  assert.deepEqual(core.cleanNotificationSettings({
+    enabled: 'false', onSuccess: 1, onInterrupted: null,
+    sound: 'https://not-allowed', soundDuration: '999', visibility: 'forever'
+  }), core.cleanNotificationSettings());
+  assert.deepEqual(core.cleanNotificationSettings([]), core.cleanNotificationSettings());
+});

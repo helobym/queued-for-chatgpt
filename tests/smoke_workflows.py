@@ -44,7 +44,17 @@ with sync_playwright() as p:
     page.locator('[data-action="save-workflow-edit"]').click()
     page.locator('#qfc-workflow-items').get_by_text('Research and report').wait_for()
     assert page.locator('.qfc-workflow-details').is_hidden()
-    page.locator('[data-action="toggle-workflow"]').click()
+    # The tiny disclosure must be immediately before the workflow title,
+    # not part of the Start / Load / Edit / Delete actions row.
+    disclosure = page.locator('[data-action="toggle-workflow"]')
+    heading = page.locator('.qfc-workflow-heading')
+    assert disclosure.locator('xpath=..').get_attribute('class').find('qfc-workflow-heading') >= 0
+    assert heading.locator('.qfc-workflow-title').inner_text() == 'Research and report'
+    assert disclosure.bounding_box()['x'] < heading.locator('.qfc-workflow-title').bounding_box()['x']
+    assert disclosure.bounding_box()['width'] <= 32
+    assert page.locator('.qfc-workflow-item .qfc-item-actions [data-action="toggle-workflow"]').count() == 0
+    disclosure.focus()
+    disclosure.press('Enter')
     page.locator('.qfc-workflow-prompt-text').get_by_text('Give five conclusions').wait_for()
     assert page.locator('[data-action="toggle-workflow"]').get_attribute('aria-expanded') == 'true'
     assert page.locator('[data-action="copy-workflow-step"]').count() == 2

@@ -1,32 +1,31 @@
-QUEUED FOR CHATGPT — v1.2.7 to v1.2.8
+QUEUED FOR CHATGPT — v1.2.8 to v1.2.9
 
-[ ] Back up important Saved Queue Workflows before updating.
-[ ] Let any running prompt finish or use Pause; inspect uncertain queued items.
-[ ] Keep the SAME existing unpacked-extension directory and extension ID.
-[ ] Download queued-for-chatgpt-v1.2.8.zip from GitHub Release v1.2.8 (Assets).
-[ ] Extract and replace all files in the existing installed folder.
-[ ] In chrome://extensions click Reload and confirm version 1.2.8.
-[ ] Refresh all ChatGPT tabs so the new content script and service worker are loaded.
-[ ] Confirm the new Chrome notifications permission is allowed; check OS Focus/Do Not Disturb settings.
-[ ] Start a harmless 2-step saved workflow and verify a single "Workflow completed successfully" desktop notification.
-[ ] Confirm the notification reports "All 2 prompts finished" and the workflow name.
-[ ] Click the notification and confirm the correct existing ChatGPT tab is activated.
-[ ] Run a queue with manual and workflow prompts and confirm one "Queue completed successfully" alert.
-[ ] Load additional workflow steps during an active run; confirm there is only one final notification.
-[ ] Trigger a safe simulated send-failure test and confirm an attention notification, never success.
-[ ] Pause a running queue yourself and confirm there is no notification.
-[ ] Manually stop a ChatGPT response and confirm there is no automatic success notification.
-[ ] Check two ChatGPT tabs: only the sending tab reports a terminal notification.
-[ ] Start a New Chat workflow and confirm its first response counts exactly once.
-[ ] Confirm the floating panel, Alt+Shift+Q, activity disclosure and existing workflow controls work.
-[ ] If desired, test Chrome Memory Saver tab discard and verify a best-effort interruption alert.
-[ ] Repeat sending receipt and response-completion checks; never auto-retry uncertain prompts.
-[ ] Record any real-device resource metrics instead of assuming CPU/RAM savings.
+[ ] Export important Saved Queue Workflows before upgrading.
+[ ] Let active prompts finish or use Pause; review any uncertain in-flight item.
+[ ] Keep the SAME installed extension directory and extension ID to preserve local queues and workflows.
+[ ] Download queued-for-chatgpt-v1.2.9.zip from GitHub Release v1.2.9 (Assets).
+[ ] Extract into the installed folder, replacing source files; include offscreen.html and offscreen.js.
+[ ] At chrome://extensions click Reload, confirm version 1.2.9 and added offscreen permission.
+[ ] Refresh all ChatGPT tabs.
+[ ] Expand/collapse a saved workflow with the small chevron before its name; check keyboard Enter and Copy.
+[ ] Confirm Start Workflow, + Load, Edit, Delete and collapsed workflow search are unchanged.
+[ ] Open the floating panel's ⚙ Notification Settings and confirm Back restores previous Queue/Workflows view.
+[ ] Confirm existing workflow expansion and Recent Activity remain intact after returning from Settings.
+[ ] Toggle success and automatic-stop notifications independently, and check all alerts disabled.
+[ ] Select Soft Chime / Double Chime / Alert Beep, choose Once / 5 / 10 / 20 seconds and use Test sound.
+[ ] Confirm System Default and Silent disable the custom-sound duration control.
+[ ] Confirm Until dismissed is best effort and does not promise a timed desktop popup.
+[ ] Confirm settings persist after closing/reopening the panel and synchronize across ChatGPT tabs.
+[ ] Run a harmless two-step workflow; verify exactly one terminal notification and correct verified count.
+[ ] If custom audio is selected, ensure it does not block queue progression or play indefinitely.
+[ ] Confirm manual Pause and manually stopping a ChatGPT response never generate automatic success alerts.
+[ ] Confirm Chrome Memory Saver discard stays an interruption, not success, where OS delivery allows.
+[ ] Verify New Chat and Project first-message handoff, cross-tab sender locking and uncertainty review.
+[ ] Inspect notification permission and OS Focus/Do Not Disturb settings when alerts are suppressed.
 
 IMPORTANT:
-- Desktop notifications require Chrome/OS permission; they may be suppressed by notification settings.
-- No message content or assistant replies are written to notification records; workflow names can appear on screen.
-- A browser crash, full shutdown, extension reload or closed/discarded tab may prevent delivery.
-- Memory Saver discard means interrupted or uncertain execution, never success.
-- The original sender lock, 100-prompt queue cap and safety checks remain unchanged.
-- Existing queues and workflows require no data migration.
+- Offscreen audio is local, generated only when requested; no external ringtone downloads.
+- Custom sound duration does not control popup visibility and is an upper bound, not a guarantee.
+- Chrome/OS may suppress sounds or system notification banners.
+- No queue schema migration or change to the existing sender/response verification logic.
+- Live ChatGPT and Chromebook resource use still require device testing.

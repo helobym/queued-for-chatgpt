@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.8 — Desktop Completion and Safety Alerts
+# Queued for ChatGPT v1.2.9 — Compact Workflows and Custom Notification Sounds
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.8](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.8)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.9](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.9)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.9:** Workflow Expand/Collapse is now a small chevron immediately to the **left of each saved workflow name**, freeing space for Start/Load/Edit/Delete. A ⚙ button in the floating panel opens **Notification Settings** for success/automatic-stop toggles, original custom notification chimes (Soft, Double, Alert), sound duration (Once, 5, 10, 20 seconds), Silent/System sound, and system-default or request-until-dismissed popup visibility. Sounds are optional, generated locally in an audio-only offscreen extension document; no server or continuous polling. The new `offscreen` permission is needed for custom sounds, alongside existing `storage` and `notifications`.
 
 **New in v1.2.8:** Receive one Chrome desktop notification when a run completes after verified responses or automatically stops because it needs attention. User Pause and manual Stop remain silent. Chrome Memory Saver discards generate best-effort interruption alerts; clicking a notification returns to the originating ChatGPT tab if it still exists. No server, background polling or prompt/response text is added to notification records. The only new permission is **notifications**.
 
@@ -24,13 +26,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.8 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.8), expand **Assets**, and download **`queued-for-chatgpt-v1.2.8.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.9 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.9), expand **Assets**, and download **`queued-for-chatgpt-v1.2.9.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.8**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.9**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -48,6 +50,15 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 ### Saved Queue Workflows
 
 ![Queued for ChatGPT v1.2.7 — Workflows page remains open while running, with expanded activity](screenshots/workflows-v1.2.7.svg)
+
+## What changed in v1.2.9
+
+- **Compact workflow disclosure:** Each saved workflow name now starts with a small, keyboard-accessible chevron. The full Expand/Collapse action button is removed from its control row; Start Workflow, + Load, Edit, Delete, full prompt details and Copy are unchanged.
+- **In-panel Notification Settings:** Click **⚙** beside the reset-position and close controls. Configure desktop notifications, completion/automatic-stop alerts, sounds, duration and visibility. **← Back** returns to the previously selected Queue/Workflows page without resetting expanded workflows.
+- **Custom sounds:** System default, Silent, Soft Chime, Double Chime and Alert Beep. Generated locally using Web Audio in an audio-only offscreen extension document, opened only when needed. A **▶ Test sound** button previews one selected custom tone.
+- **Bounded audio:** Choose Once, 5, 10 or 20 seconds for custom tones. System Default and Silent do not enable this control. The system decides whether sound actually plays; duration is an upper bound, not guaranteed uninterrupted audio.
+- **Visibility choices:** System Default or **Until dismissed (where supported)** via Chrome's `requireInteraction` option. Arbitrary 5/10-second Chrome popup lifetimes are not available.
+- **No queue changes:** Settings use a separate `chrome.storage.local` key and synchronize across extension tabs. Sender locks, safe receipt/response checks, queued prompt data and automatic/manual stop semantics remain unchanged.
 
 ## What changed in v1.2.8
 
@@ -127,7 +138,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.8.zip`** from the [v1.2.8 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.8) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.9.zip`** from the [v1.2.9 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.9) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs to load the new content script.
@@ -171,6 +182,14 @@ On **Workflows**, each saved workflow starts collapsed. Click **Expand** to see 
 
 On **Queue**, **Copy** remains available for pending, sending or awaiting-response prompts. All Copy actions preserve full text and line breaks, show brief success/failure feedback, and never send, edit, pause, or remove prompts. Clipboard contents may be accessible to other applications on the device.
 
+## Notification Settings and custom sound
+
+Open the floating **☷ Queue** panel, then click **⚙ Notification settings** in the header. The Settings view has independent controls for enabling all desktop notifications, verified success notifications and automatic-stop notifications. It also offers original locally generated tones: **Soft Chime**, **Double Chime** and **Alert Beep**. Choose a tone and **Once**, **5**, **10** or **20 seconds**, then click **▶ Test sound** to preview it. Select **System default** to use the system's usual behavior or **Silent** for a visible notification without notification audio.
+
+**Until dismissed** requests a persistent Chrome notification where supported; Chrome/OS may still dismiss it. **Sound duration is not popup duration**, and OS sound/Focus/Do Not Disturb or browser restrictions can suppress audio or notifications entirely. Custom audio uses the `offscreen` permission, opens an audio-only extension context only as needed, and runs a bounded timer there. No ringtone files are downloaded; no text from prompts or AI responses is included in sound instructions.
+
+The same preferences apply across ChatGPT tabs. They do not interrupt the active queue and do not change how many prompts have been verified. Only automatic completion or automatic-interruption events trigger alerts; manual Pause and manual Stop stay silent.
+
 ## Desktop notifications
 
 After you click **Start** or **Start Workflow**, the extension monitors the run using its existing conservative send/response verification. When the final response has been verified, Chrome displays **Workflow completed successfully** with the verified prompt count and workflow name, or **Queue completed successfully** when prompts come from different sources.
@@ -208,6 +227,8 @@ Playwright (installed Chromium, simulated page):
 - `tests/smoke_workflow_load_during_run.py` — Load while idle does not send; Load while running appends after existing prompts and the active runner processes the new steps.
 - `tests/smoke_workflow_new_chat.py` — directly start workflow on New Chat and verify the first prompt is counted exactly once in the completion alert.
 - `tests/smoke_notifications.py` — verified completion, automatic send-stop notification, manual Pause silence and notification-click behavior.
+- `tests/smoke_v129_settings.py` — in-panel Settings, compact workflow disclosure, saved preferences, custom sound preview and disabled alerts.
+- `tests/offscreen_audio.test.js` — bounded generated tone scheduling, replacement, rejection of malformed messages and automatic cleanup.
 - `tests/notifications.test.js` — worker deduplication, session recovery, tab discard, missing permissions and malicious/stale event rejection.
 - `tests/smoke_project_workflows.py` — Project Load/Start, first-send migration, cross-Project isolation and reload persistence.
 - `tests/smoke_queue_copy.py` — complete-text Copy for queued prompts and individual saved workflow steps, including clipboard failures.

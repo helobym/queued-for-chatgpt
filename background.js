@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.8 — serialized coordinator, shortcuts and verified run alerts. */
+/* Queued for ChatGPT v1.2.9 — configurable notification alerts and bounded audio. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;
@@ -39,8 +39,56 @@ async function storeRun(tabId, record) {
     else await chrome.storage.session.remove(runKey(tabId));
   } catch (_) { /* Fallback stays valid until this worker sleeps. */ }
 }
+// Audio is optional. Only one offscreen document and a single in-flight
+// creation promise are used even when several runs finish at the same time.
+let creatingAudioDocument = null;
+async function ensureAudioDocument() {
+  if (!chrome.offscreen?.createDocument || !chrome.runtime?.sendMessage) return false;
+  if (creatingAudioDocument) return creatingAudioDocument;
+  creatingAudioDocument = (async () => {
+    if (chrome.runtime.getContexts) {
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: ['OFFSCREEN_DOCUMENT'],
+        documentUrls: [chrome.runtime.getURL('offscreen.html')]
+      });
+      if (contexts.length) return true;
+    } else if (chrome.offscreen.hasDocument && await chrome.offscreen.hasDocument()) {
+      return true;
+    }
+    await chrome.offscreen.createDocument({
+      url: 'offscreen.html',
+      reasons: ['AUDIO_PLAYBACK'],
+      justification: 'Play optional, bounded user-selected queue notification sounds.'
+    });
+    return true;
+  })();
+  try { return await creatingAudioDocument; }
+  catch (_) { return false; }
+  finally { creatingAudioDocument = null; }
+}
+async function playConfiguredSound(sound, duration) {
+  if (!['soft', 'double', 'alert'].includes(sound) ||
+      !['once', '5', '10', '20'].includes(duration)) return false;
+  try {
+    if (!await ensureAudioDocument()) return false;
+    const result = await chrome.runtime.sendMessage({
+      app: 'qfc-audio-v1', action: 'play', sound, duration
+    });
+    return result?.played === true;
+  } catch (_) { return false; }
+}
+async function getNotificationSettings() {
+  // A failed settings read must not silently override the user's opt-out.
+  try {
+    const stored = await chrome.storage.local.get(C.NOTIFICATION_SETTINGS_KEY);
+    return C.cleanNotificationSettings(stored[C.NOTIFICATION_SETTINGS_KEY]);
+  } catch (_) { return null; }
+}
 async function showRunNotification(run, outcome, count, name, reason) {
-  if (!chrome.notifications?.create) return;
+  const settings = await getNotificationSettings();
+  if (!settings?.enabled || !chrome.notifications?.create ||
+      (outcome === 'success' && !settings.onSuccess) ||
+      (outcome !== 'success' && !settings.onInterrupted)) return;
   const workflowName = C.validWorkflowName(name) ? name.trim() : '';
   const suffix = workflowName ? ' · ' + workflowName : '';
   const title = outcome === 'success'
@@ -53,13 +101,20 @@ async function showRunNotification(run, outcome, count, name, reason) {
     ? ' · ' + count + ' verified' : '';
   const iconUrl = chrome.runtime.getURL
     ? chrome.runtime.getURL('icons/icon128.png') : 'icons/icon128.png';
+  const custom = ['soft', 'double', 'alert'].includes(settings.sound);
   try {
     await chrome.notifications.create('qfc-run-' + run.tabId + '-' + run.runId, {
       type: 'basic', iconUrl, title,
-      message: (detail + progress + suffix).slice(0, 250)
+      message: (detail + progress + suffix).slice(0, 250),
+      silent: custom || settings.sound === 'silent',
+      requireInteraction: settings.visibility === 'persistent'
     });
+    // Do not await playback in the serialized queue coordinator. The audio
+    // document owns its own bounded timer and audio resources.
+    if (custom) void playConfiguredSound(settings.sound, settings.soundDuration);
   } catch (_) { /* User/OS may block notifications. */ }
 }
+
 async function runLifecycle(message, sender) {
   const tabId = sender.tab?.id;
   if (!Number.isSafeInteger(tabId) || tabId < 0 || !RUN_ID.test(message.runId))
@@ -181,6 +236,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!allowedSender(sender) || !message || message.app !== 'qfc-v1.1') return false;
   serialized(async () => {
     if (message.command === 'runLifecycle') return runLifecycle(message, sender);
+    if (message.command === 'notificationPermission')
+      return chrome.notifications?.getPermissionLevel
+        ? chrome.notifications.getPermissionLevel() : 'unavailable';
+    if (message.command === 'previewSound')
+      return { played: await playConfiguredSound(message.sound, message.duration) };
     if (message.command === 'getQueue') return load('queue', message.route);
     if (message.command === 'getFavorites') return load('favorites');
     if (message.command === 'getWorkflows') return load('workflows');
