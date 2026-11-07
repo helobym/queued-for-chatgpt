@@ -70,21 +70,40 @@ test('notification settings default safely and use an independent storage key', 
   const defaults = core.cleanNotificationSettings();
   assert.deepEqual(defaults, {
     enabled: true, onSuccess: true, onInterrupted: true,
-    sound: 'system', soundDuration: 'once', visibility: 'system'
+    sound: 'system', soundDuration: 'once', soundVolume: 75, visibility: 'system'
   });
   assert.notEqual(core.NOTIFICATION_SETTINGS_KEY, core.SETTINGS_KEY);
 });
 test('notification settings clean strictly validates types and allowed options', () => {
   assert.deepEqual(core.cleanNotificationSettings({
     enabled: false, onSuccess: true, onInterrupted: false,
-    sound: 'alert', soundDuration: '20', visibility: 'persistent', extra: 'ignored'
+    sound: 'alert', soundDuration: '20', soundVolume: 90, visibility: 'persistent', extra: 'ignored'
   }), {
     enabled: false, onSuccess: true, onInterrupted: false,
-    sound: 'alert', soundDuration: '20', visibility: 'persistent'
+    sound: 'alert', soundDuration: '20', soundVolume: 90, visibility: 'persistent'
   });
   assert.deepEqual(core.cleanNotificationSettings({
     enabled: 'false', onSuccess: 1, onInterrupted: null,
-    sound: 'https://not-allowed', soundDuration: '999', visibility: 'forever'
+    sound: 'https://not-allowed', soundDuration: '999', soundVolume: 500, visibility: 'forever'
   }), core.cleanNotificationSettings());
   assert.deepEqual(core.cleanNotificationSettings([]), core.cleanNotificationSettings());
+});
+
+test('custom durations and volume are bounded and legacy values remain valid', () => {
+  for (const duration of ['once', '1', '2', '5', '10', '20', '59', '60']) {
+    assert.equal(core.cleanNotificationSettings({soundDuration:duration}).soundDuration,duration);
+    assert.equal(core.validSoundDuration(duration),true);
+  }
+  for (const duration of ['0', '61', '01', '1.5', ' 5', '999', 5, null]) {
+    assert.equal(core.validSoundDuration(duration),false);
+    assert.equal(core.cleanNotificationSettings({soundDuration:duration}).soundDuration,'once');
+  }
+  for (const volume of [0,1,75,99,100]) {
+    assert.equal(core.validSoundVolume(volume),true);
+    assert.equal(core.cleanNotificationSettings({soundVolume:volume}).soundVolume,volume);
+  }
+  for (const volume of [-1,101,75.5,'75',null]) {
+    assert.equal(core.validSoundVolume(volume),false);
+    assert.equal(core.cleanNotificationSettings({soundVolume:volume}).soundVolume,75);
+  }
 });

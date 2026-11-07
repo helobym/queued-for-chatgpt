@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.10 (2026-11-07)
+
+- Made desktop/completion/automatic-stop notification settings obvious with ON/OFF switches, descriptions and Saved/Save failed feedback.
+- Extended locally generated custom sound duration to Play Once or 1–60 seconds; added adjustable volume from 0% to 100%.
+- Reused at most two oscillator/gain pairs per tone even for 60-second audio, with bounded timer and full cleanup; retained one active player and no idle polling.
+- Added short Test sound and silent Test notification actions without touching queue execution.
+- Preserved existing notification opt-outs, run-ID deduplication, Web Locks, New Chat/Project safety, and the installed extension storage key.
+- Updated tests, documented ChromeOS limitations and built a versioned GitHub release workflow.
+
 ## 1.2.9 (2026-11-07)
 
 - Moved the Saved Workflow Expand/Collapse action to a compact, accessible chevron at the left of each workflow name.

@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.9 — configurable notification alerts and bounded audio. */
+/* Queued for ChatGPT v1.2.10 — configurable notification alerts and low-allocation audio. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;
@@ -66,15 +66,44 @@ async function ensureAudioDocument() {
   catch (_) { return false; }
   finally { creatingAudioDocument = null; }
 }
-async function playConfiguredSound(sound, duration) {
+async function playConfiguredSound(sound, duration, volume) {
   if (!['soft', 'double', 'alert'].includes(sound) ||
-      !['once', '5', '10', '20'].includes(duration)) return false;
+      !C.validSoundDuration(duration) || !C.validSoundVolume(volume) || volume === 0) return false;
   try {
     if (!await ensureAudioDocument()) return false;
     const result = await chrome.runtime.sendMessage({
-      app: 'qfc-audio-v1', action: 'play', sound, duration
+      app: 'qfc-audio-v1', action: 'play', sound, duration, volume
     });
     return result?.played === true;
+  } catch (_) { return false; }
+}
+// Stopping sound must never create an offscreen document.
+async function stopConfiguredSound() {
+  try {
+    const exists = chrome.runtime.getContexts
+      ? (await chrome.runtime.getContexts({
+          contextTypes: ['OFFSCREEN_DOCUMENT'],
+          documentUrls: [chrome.runtime.getURL('offscreen.html')]
+        })).length > 0
+      : (chrome.offscreen?.hasDocument ? await chrome.offscreen.hasDocument() : false);
+    if (!exists) return true;
+    const result = await chrome.runtime.sendMessage({ app: 'qfc-audio-v1', action: 'stop' });
+    return result?.stopped === true;
+  } catch (_) { return false; }
+}
+async function showTestNotification(tabId) {
+  const settings = await getNotificationSettings();
+  if (!settings?.enabled || !chrome.notifications?.create) return false;
+  try {
+    await chrome.notifications.create('qfc-test-' + tabId, {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+      title: 'Queued for ChatGPT — test notification',
+      message: 'Notification test requested. No queue or workflow was started.',
+      silent: true,
+      requireInteraction: false
+    });
+    return true; // Requested from Chrome, not guaranteed shown by ChromeOS.
   } catch (_) { return false; }
 }
 async function getNotificationSettings() {
@@ -111,7 +140,8 @@ async function showRunNotification(run, outcome, count, name, reason) {
     });
     // Do not await playback in the serialized queue coordinator. The audio
     // document owns its own bounded timer and audio resources.
-    if (custom) void playConfiguredSound(settings.sound, settings.soundDuration);
+    if (custom && settings.soundVolume > 0)
+      void playConfiguredSound(settings.sound, settings.soundDuration, settings.soundVolume);
   } catch (_) { /* User/OS may block notifications. */ }
 }
 
@@ -240,7 +270,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return chrome.notifications?.getPermissionLevel
         ? chrome.notifications.getPermissionLevel() : 'unavailable';
     if (message.command === 'previewSound')
-      return { played: await playConfiguredSound(message.sound, message.duration) };
+      return { played: await playConfiguredSound(message.sound, message.duration, message.volume) };
+    if (message.command === 'stopSound')
+      return { stopped: await stopConfiguredSound() };
+    if (message.command === 'testNotification')
+      return { requested: await showTestNotification(sender.tab.id) };
     if (message.command === 'getQueue') return load('queue', message.route);
     if (message.command === 'getFavorites') return load('favorites');
     if (message.command === 'getWorkflows') return load('workflows');

@@ -1,31 +1,31 @@
-QUEUED FOR CHATGPT — v1.2.8 to v1.2.9
+QUEUED FOR CHATGPT — v1.2.9 to v1.2.10
 
 [ ] Export important Saved Queue Workflows before upgrading.
 [ ] Let active prompts finish or use Pause; review any uncertain in-flight item.
 [ ] Keep the SAME installed extension directory and extension ID to preserve local queues and workflows.
-[ ] Download queued-for-chatgpt-v1.2.9.zip from GitHub Release v1.2.9 (Assets).
-[ ] Extract into the installed folder, replacing source files; include offscreen.html and offscreen.js.
-[ ] At chrome://extensions click Reload, confirm version 1.2.9 and added offscreen permission.
-[ ] Refresh all ChatGPT tabs.
-[ ] Expand/collapse a saved workflow with the small chevron before its name; check keyboard Enter and Copy.
-[ ] Confirm Start Workflow, + Load, Edit, Delete and collapsed workflow search are unchanged.
-[ ] Open the floating panel's ⚙ Notification Settings and confirm Back restores previous Queue/Workflows view.
-[ ] Confirm existing workflow expansion and Recent Activity remain intact after returning from Settings.
-[ ] Toggle success and automatic-stop notifications independently, and check all alerts disabled.
-[ ] Select Soft Chime / Double Chime / Alert Beep, choose Once / 5 / 10 / 20 seconds and use Test sound.
-[ ] Confirm System Default and Silent disable the custom-sound duration control.
+[ ] Download queued-for-chatgpt-v1.2.10.zip from GitHub Release v1.2.10 (Assets).
+[ ] Extract into the installed folder, replacing source files; keep offscreen.html and offscreen.js.
+[ ] At chrome://extensions click Reload, confirm version 1.2.10 and refresh all ChatGPT tabs.
+[ ] Verify Queue, Workflows, compact disclosure, Copy, Load and Start remain unchanged.
+[ ] Open the floating panel's ⚙ Notification Settings; verify Back retains selected view and expanded workflows.
+[ ] Toggle Desktop notifications, Workflow completed and Stopped automatically, confirming ON/OFF and Saved status.
+[ ] Select a custom tone; test Play Once and custom duration values including 1, 14 and 60 seconds.
+[ ] Verify invalid custom durations are rejected without overwriting the last saved preference.
+[ ] Set custom volume from 0% to 100%; verify Test sound (2s) is silent/disabled at 0%.
+[ ] Verify Test notification requests one silent desktop alert and does not start or modify queued work.
+[ ] Confirm System Default and Silent disable custom duration, volume and preview.
 [ ] Confirm Until dismissed is best effort and does not promise a timed desktop popup.
 [ ] Confirm settings persist after closing/reopening the panel and synchronize across ChatGPT tabs.
 [ ] Run a harmless two-step workflow; verify exactly one terminal notification and correct verified count.
-[ ] If custom audio is selected, ensure it does not block queue progression or play indefinitely.
+[ ] If custom audio is selected, ensure it does not block queue progression, overlap or play indefinitely.
 [ ] Confirm manual Pause and manually stopping a ChatGPT response never generate automatic success alerts.
 [ ] Confirm Chrome Memory Saver discard stays an interruption, not success, where OS delivery allows.
 [ ] Verify New Chat and Project first-message handoff, cross-tab sender locking and uncertainty review.
-[ ] Inspect notification permission and OS Focus/Do Not Disturb settings when alerts are suppressed.
+[ ] Compare ChromeOS idle CPU/memory and active 60-second alert resource usage with v1.2.9.
 
 IMPORTANT:
-- Offscreen audio is local, generated only when requested; no external ringtone downloads.
-- Custom sound duration does not control popup visibility and is an upper bound, not a guarantee.
-- Chrome/OS may suppress sounds or system notification banners.
-- No queue schema migration or change to the existing sender/response verification logic.
-- Live ChatGPT and Chromebook resource use still require device testing.
+- Original custom tones are generated locally with at most two oscillator/gain pairs; no external ringtone downloads.
+- Custom sound duration never controls how long the ChromeOS desktop popup is shown.
+- The selected custom volume cannot override system mute or ChromeOS notification restrictions.
+- Audio and notification delivery remain best effort if ChromeOS suppresses them.
+- No queue schema migration, additional permissions or change to Send/response verification logic.

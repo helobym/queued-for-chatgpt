@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.9 — compact workflows and configurable notification alerts. */
+/* Queued for ChatGPT v1.2.10 — lightweight notification settings and audio. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -65,6 +65,56 @@
   // Saved workflow expansion and selected Queue/Workflows tab remain untouched.
   let settingsOpen = false;
   let notificationSettings = C.cleanNotificationSettings();
+  let confirmedNotificationSettings = notificationSettings;
+  let customSecondsDraft = '10';
+  let settingsRevision = 0, savedSettingsRevision = 0;
+  let notificationWriteLoop = null;
+  let notificationSaveStatus = 'Ready';
+  // Persist at most one settings record at a time; coalesce rapid changes and
+  // avoid newer local selections being replaced by stale storage events.
+  async function persistNotificationSettings() {
+    if (notificationWriteLoop) return notificationWriteLoop;
+    const loop = (async () => {
+      while (savedSettingsRevision < settingsRevision) {
+        const revision = settingsRevision;
+        const snapshot = notificationSettings;
+        try {
+          await STORAGE.set({ [C.NOTIFICATION_SETTINGS_KEY]: snapshot });
+          confirmedNotificationSettings = snapshot;
+          savedSettingsRevision = revision;
+        } catch (_) {
+          notificationSettings = confirmedNotificationSettings;
+          savedSettingsRevision = settingsRevision;
+          notificationSaveStatus = 'Save failed — previous settings restored.';
+          renderNotificationSettings();
+          return;
+        }
+      }
+      notificationSaveStatus = 'Saved';
+      renderNotificationSettings();
+    })();
+    notificationWriteLoop = loop;
+    try { await loop; }
+    finally {
+      notificationWriteLoop = null;
+      if (savedSettingsRevision < settingsRevision) void persistNotificationSettings();
+    }
+  }
+  function saveNotificationSettings(next) {
+    const previous = notificationSettings;
+    notificationSettings = C.cleanNotificationSettings(next);
+    settingsRevision++;
+    notificationSaveStatus = 'Saving…';
+    renderNotificationSettings();
+    // Switching notifications off, choosing Silent/System, or setting volume
+    // to zero should also stop an already-active custom sound.
+    const stopSound = (previous.enabled && !notificationSettings.enabled) ||
+      (['soft', 'double', 'alert'].includes(previous.sound) &&
+       !['soft', 'double', 'alert'].includes(notificationSettings.sound)) ||
+      (previous.soundVolume > 0 && notificationSettings.soundVolume === 0);
+    if (stopSound) void rpc('stopSound').catch(() => {});
+    void persistNotificationSettings();
+  }
   // Page-local execution session. Never persist full prompts or responses.
   let activeRun = null;
   function runEvent(run, action, reason = 'unexpected') {
@@ -417,14 +467,24 @@
             <strong>Notification Settings</strong>
           </div>
           <label class="qfc-setting-row" for="qfc-notify-enabled">
-            <span>Desktop notifications</span><input type="checkbox" id="qfc-notify-enabled" data-notification-setting="enabled">
+            <span class="qfc-setting-copy"><strong>Desktop notifications</strong><small>Allow completion and automatic-stop alerts</small></span>
+            <span class="qfc-switch-wrap"><span class="qfc-switch-state" id="qfc-notify-enabled-state">ON</span>
+              <input type="checkbox" class="qfc-switch-input" id="qfc-notify-enabled" data-notification-setting="enabled">
+              <span class="qfc-switch-track" aria-hidden="true"></span></span>
           </label>
           <label class="qfc-setting-row" for="qfc-notify-success">
-            <span>Workflow completed</span><input type="checkbox" id="qfc-notify-success" data-notification-setting="onSuccess">
+            <span class="qfc-setting-copy"><strong>Workflow completed</strong><small>When all queued prompts finish</small></span>
+            <span class="qfc-switch-wrap"><span class="qfc-switch-state" id="qfc-notify-success-state">ON</span>
+              <input type="checkbox" class="qfc-switch-input" id="qfc-notify-success" data-notification-setting="onSuccess">
+              <span class="qfc-switch-track" aria-hidden="true"></span></span>
           </label>
           <label class="qfc-setting-row" for="qfc-notify-interrupted">
-            <span>Stopped automatically</span><input type="checkbox" id="qfc-notify-interrupted" data-notification-setting="onInterrupted">
+            <span class="qfc-setting-copy"><strong>Stopped automatically</strong><small>When a run requires your attention</small></span>
+            <span class="qfc-switch-wrap"><span class="qfc-switch-state" id="qfc-notify-interrupted-state">ON</span>
+              <input type="checkbox" class="qfc-switch-input" id="qfc-notify-interrupted" data-notification-setting="onInterrupted">
+              <span class="qfc-switch-track" aria-hidden="true"></span></span>
           </label>
+          <p class="qfc-settings-feedback" id="qfc-settings-save-status" role="status" aria-live="polite">Ready</p>
           <label class="qfc-label" for="qfc-notify-sound">Notification sound</label>
           <select id="qfc-notify-sound" data-notification-setting="sound">
             <option value="system">System default</option>
@@ -433,21 +493,33 @@
             <option value="alert">Alert Beep</option>
             <option value="silent">Silent</option>
           </select>
-          <label class="qfc-label" for="qfc-notify-duration">Custom sound duration</label>
-          <select id="qfc-notify-duration" data-notification-setting="soundDuration">
-            <option value="once">Once</option>
-            <option value="5">5 seconds</option>
-            <option value="10">10 seconds</option>
-            <option value="20">20 seconds</option>
+          <label class="qfc-label" for="qfc-notify-duration-mode">Custom sound duration</label>
+          <select id="qfc-notify-duration-mode">
+            <option value="once">Play once</option>
+            <option value="timed">Custom duration</option>
           </select>
+          <div class="qfc-setting-inline">
+            <input type="number" id="qfc-notify-duration" min="1" max="60" step="1" inputmode="numeric" value="10" aria-label="Custom sound duration in seconds">
+            <span>seconds (1–60)</span>
+          </div>
+          <label class="qfc-label" for="qfc-notify-volume">Custom sound volume</label>
+          <div class="qfc-setting-inline">
+            <input type="range" min="0" max="100" step="5" id="qfc-notify-volume" data-notification-setting="soundVolume">
+            <output id="qfc-notify-volume-value" for="qfc-notify-volume">75%</output>
+          </div>
+          <p class="qfc-settings-help">Volume changes only the custom chimes, not system notification audio.</p>
           <label class="qfc-label" for="qfc-notify-visibility">Notification visibility</label>
           <select id="qfc-notify-visibility" data-notification-setting="visibility">
             <option value="system">System default</option>
             <option value="persistent">Until dismissed (where supported)</option>
           </select>
-          <button type="button" class="qfc-small" data-action="test-notification-sound" id="qfc-test-sound">▶ Test sound</button>
+          <div class="qfc-settings-tests">
+            <button type="button" class="qfc-small" data-action="test-notification-sound" id="qfc-test-sound">▶ Test sound (2s)</button>
+            <button type="button" class="qfc-small" data-action="test-desktop-notification" id="qfc-test-notification">Test notification</button>
+          </div>
+          <p class="qfc-settings-help" id="qfc-notify-preview" role="status" aria-live="polite"></p>
           <p class="qfc-settings-help" id="qfc-notify-permission" role="status">Checking Chrome notification permission…</p>
-          <p class="qfc-settings-help">Sound duration controls only custom audio, not how long Chrome displays a popup. System and device settings may suppress notifications and sounds.</p>
+          <p class="qfc-settings-help">Sound duration affects only custom audio, not popup visibility. ChromeOS may suppress notifications or sound.</p>
         </div>
         <footer id="qfc-status" role="status">Paused</footer>
       </section>`;
@@ -461,16 +533,38 @@
     workflowSearch.addEventListener('input', renderWorkflows);
     root.querySelector('#qfc-import-file').addEventListener('change', importFile);
     root.addEventListener('change', event => {
-      const key = event.target.dataset?.notificationSetting;
+      const target = event.target;
+      if (target.id === 'qfc-notify-duration-mode') {
+        if (target.value === 'once' && notificationSettings.soundDuration !== 'once')
+          customSecondsDraft = notificationSettings.soundDuration;
+        const duration = target.value === 'once' ? 'once' : customSecondsDraft;
+        if (C.validSoundDuration(duration)) {
+          saveNotificationSettings({ ...notificationSettings, soundDuration: duration });
+        }
+        return;
+      }
+      if (target.id === 'qfc-notify-duration') {
+        const duration = target.value.trim();
+        if (duration === 'once' || !C.validSoundDuration(duration)) {
+          notificationSaveStatus = 'Enter a whole number from 1 to 60 seconds.';
+          renderNotificationSettings();
+          return;
+        }
+        customSecondsDraft = duration;
+        saveNotificationSettings({ ...notificationSettings, soundDuration: duration });
+        return;
+      }
+      const key = target.dataset?.notificationSetting;
       if (!key || !(key in C.DEFAULT_NOTIFICATION_SETTINGS)) return;
-      const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
-      notificationSettings = C.cleanNotificationSettings({ ...notificationSettings, [key]: value });
-      renderNotificationSettings();
-      // Independent from C.SETTINGS_KEY (panel-open state) and queue storage.
-      STORAGE.set({ [C.NOTIFICATION_SETTINGS_KEY]: notificationSettings })
-        .catch(() => notify('Could not save notification settings. Check extension storage.'));
+      const value = target.type === 'checkbox' ? target.checked
+        : target.type === 'range' ? Number(target.value) : target.value;
+      saveNotificationSettings({ ...notificationSettings, [key]: value });
     });
     root.addEventListener('input', event => {
+      if (event.target.id === 'qfc-notify-volume') {
+        root.querySelector('#qfc-notify-volume-value').textContent = event.target.value + '%';
+        return;
+      }
       const draft = state.workflowDraft;
       if (!draft) return;
       if (event.target.id === 'qfc-edit-workflow-name') draft.name = event.target.value;
@@ -596,15 +690,31 @@
   function renderNotificationSettings() {
     if (!root) return;
     const values = notificationSettings;
+    const custom = ['soft', 'double', 'alert'].includes(values.sound);
     for (const control of root.querySelectorAll('[data-notification-setting]')) {
       const value = values[control.dataset.notificationSetting];
-      if (control.type === 'checkbox') control.checked = Boolean(value);
-      else control.value = value;
+      if (control.type === 'checkbox') {
+        control.checked = Boolean(value);
+        const stateLabel = root.querySelector('#' + control.id + '-state');
+        if (stateLabel) stateLabel.textContent = value ? 'ON' : 'OFF';
+      } else control.value = value;
       control.disabled = control.id !== 'qfc-notify-enabled' && !values.enabled;
     }
-    const custom = ['soft', 'double', 'alert'].includes(values.sound);
-    root.querySelector('#qfc-notify-duration').disabled = !values.enabled || !custom;
-    root.querySelector('#qfc-test-sound').disabled = !values.enabled || !custom;
+    if (values.soundDuration !== 'once') customSecondsDraft = values.soundDuration;
+    const mode = root.querySelector('#qfc-notify-duration-mode');
+    mode.value = values.soundDuration === 'once' ? 'once' : 'timed';
+    mode.disabled = !values.enabled || !custom;
+    const duration = root.querySelector('#qfc-notify-duration');
+    duration.value = values.soundDuration === 'once' ? customSecondsDraft : values.soundDuration;
+    duration.disabled = !values.enabled || !custom || values.soundDuration === 'once';
+    root.querySelector('#qfc-notify-volume').disabled = !values.enabled || !custom;
+    root.querySelector('#qfc-notify-volume-value').textContent = values.soundVolume + '%';
+    root.querySelector('#qfc-test-sound').disabled = !values.enabled || !custom || values.soundVolume === 0;
+    root.querySelector('#qfc-test-notification').disabled = !values.enabled;
+    const feedback = root.querySelector('#qfc-settings-save-status');
+    feedback.textContent = notificationSaveStatus;
+    feedback.dataset.state = notificationSaveStatus.startsWith('Save failed') ? 'error'
+      : notificationSaveStatus === 'Saved' ? 'saved' : 'neutral';
   }
   async function updateNotificationPermission() {
     const info = root?.querySelector('#qfc-notify-permission');
@@ -918,15 +1028,32 @@
         render();
         setPanelPosition(panelOffsetX, panelOffsetY);
         break;
-      case 'test-notification-sound':
-        if (!notificationSettings.enabled || !['soft', 'double', 'alert'].includes(notificationSettings.sound)) break;
+      case 'test-notification-sound': {
+        if (!notificationSettings.enabled || !['soft', 'double', 'alert'].includes(notificationSettings.sound) ||
+            notificationSettings.soundVolume === 0) break;
+        const info = root.querySelector('#qfc-notify-preview');
+        info.textContent = 'Requesting sound preview…';
         try {
           const result = await rpc('previewSound', {
-            sound: notificationSettings.sound, duration: notificationSettings.soundDuration
+            sound: notificationSettings.sound, duration: '2', volume: notificationSettings.soundVolume
           });
-          if (!result?.played) notify('Sound preview unavailable. Check Chrome extension permissions and audio.');
-        } catch (_) { notify('Could not play selected sound.'); }
+          info.textContent = result?.played
+            ? 'Sound preview requested. Check your device volume if it is not audible.'
+            : 'Sound preview unavailable. Check ChromeOS audio settings.';
+        } catch (_) { info.textContent = 'Could not start sound preview.'; }
         break;
+      }
+      case 'test-desktop-notification': {
+        const info = root.querySelector('#qfc-notify-preview');
+        info.textContent = 'Requesting test notification…';
+        try {
+          const result = await rpc('testNotification');
+          info.textContent = result?.requested
+            ? 'Test notification requested from Chrome. Check ChromeOS notifications.'
+            : 'Test notification unavailable or blocked.';
+        } catch (_) { info.textContent = 'Could not request test notification.'; }
+        break;
+      }
       case 'reset-position': resetPanelPosition(); break;
       case 'tab-queue': setTab('queue'); break;
       case 'tab-workflows': setTab('workflows'); break;
@@ -1564,6 +1691,8 @@
       applyWorkflows(record);
       state.open = Boolean(settings[C.SETTINGS_KEY]?.open);
       notificationSettings = C.cleanNotificationSettings(settings[C.NOTIFICATION_SETTINGS_KEY]);
+      confirmedNotificationSettings = notificationSettings;
+      if (notificationSettings.soundDuration !== 'once') customSecondsDraft = notificationSettings.soundDuration;
       renderNotificationSettings();
     } catch (_) { state.storageHealthy = false; setStatus('Could not load workflows. Reload the tab.'); }
     checkRoute();
@@ -1581,8 +1710,11 @@
     });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
-      if (changes[C.NOTIFICATION_SETTINGS_KEY]) {
+      if (changes[C.NOTIFICATION_SETTINGS_KEY] && !notificationWriteLoop &&
+          settingsRevision === savedSettingsRevision) {
         notificationSettings = C.cleanNotificationSettings(changes[C.NOTIFICATION_SETTINGS_KEY].newValue);
+        confirmedNotificationSettings = notificationSettings;
+        notificationSaveStatus = 'Saved';
         renderNotificationSettings();
       }
       if (changes[C.WORKFLOWS_KEY]) applyWorkflows(changes[C.WORKFLOWS_KEY].newValue);

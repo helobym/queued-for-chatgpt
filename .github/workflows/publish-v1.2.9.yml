@@ -1,22 +1,6 @@
 name: Publish v1.2.9 GitHub Release
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/publish-v1.2.9.yml'
-      - 'content.js'
-      - 'content.css'
-      - 'background.js'
-      - 'core.js'
-      - 'offscreen.html'
-      - 'offscreen.js'
-      - 'manifest.json'
-      - 'tests/**'
-      - 'README.md'
-      - 'PRIVACY.md'
-      - 'CHANGELOG.md'
-      - 'UPGRADE-CHECKLIST.txt'
   workflow_dispatch:
 
 permissions:

@@ -10,8 +10,14 @@
   const NOTIFICATION_SETTINGS_KEY = 'qfc_v1_notification_settings';
   const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({
     enabled: true, onSuccess: true, onInterrupted: true,
-    sound: 'system', soundDuration: 'once', visibility: 'system'
+    sound: 'system', soundDuration: 'once', soundVolume: 75, visibility: 'system'
   });
+  function validSoundDuration(value) {
+    return value === 'once' || (typeof value === 'string' && /^(?:[1-9]|[1-5][0-9]|60)$/.test(value));
+  }
+  function validSoundVolume(value) {
+    return Number.isInteger(value) && value >= 0 && value <= 100;
+  }
   function cleanNotificationSettings(input) {
     const value = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
     const defaults = DEFAULT_NOTIFICATION_SETTINGS;
@@ -20,7 +26,8 @@
       onSuccess: typeof value.onSuccess === 'boolean' ? value.onSuccess : defaults.onSuccess,
       onInterrupted: typeof value.onInterrupted === 'boolean' ? value.onInterrupted : defaults.onInterrupted,
       sound: ['system', 'soft', 'double', 'alert', 'silent'].includes(value.sound) ? value.sound : defaults.sound,
-      soundDuration: ['once', '5', '10', '20'].includes(value.soundDuration) ? value.soundDuration : defaults.soundDuration,
+      soundDuration: validSoundDuration(value.soundDuration) ? value.soundDuration : defaults.soundDuration,
+      soundVolume: validSoundVolume(value.soundVolume) ? value.soundVolume : defaults.soundVolume,
       visibility: ['system', 'persistent'].includes(value.visibility) ? value.visibility : defaults.visibility
     };
   }
@@ -189,6 +196,7 @@
   }
   const api = { VERSION, MAX_PROMPT_LENGTH, MAX_FAVORITES, MAX_QUEUE, FAV_KEY, SETTINGS_KEY,
     NOTIFICATION_SETTINGS_KEY, DEFAULT_NOTIFICATION_SETTINGS, cleanNotificationSettings,
+    validSoundDuration, validSoundVolume,
     WORKFLOWS_KEY, MAX_WORKFLOWS, MAX_WORKFLOW_CHARS, MAX_WORKFLOWS_TOTAL_CHARS, MAX_ACTIVITY_PREVIEW,
     validWorkflowName, cleanWorkflowSteps, cleanWorkflows, cleanWorkflowOrigin, cleanLastCompleted,
     normalize, validText, conversationId, queueKey, newQueueItem, cleanQueue,

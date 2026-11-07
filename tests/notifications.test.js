@@ -17,7 +17,7 @@ function makeWorker(shared = { local: {}, session: {}, notices: [], focused: [] 
       async getContexts() { return shared.audioDocument ? [{documentUrl:'offscreen.html'}] : []; },
       async sendMessage(message) {
         (shared.audioMessages ||= []).push(message);
-        return { played: !shared.rejectAudio };
+        return message.action === 'stop' ? {stopped:true} : {played:!shared.rejectAudio};
       }
     },
     commands: { onCommand: { addListener() {} } },
@@ -201,7 +201,7 @@ test('notification click does not open tabs or focus unrelated pages',async()=>{
 test('custom chime uses silent desktop notification and only one offscreen document', async()=>{
   const shared={local:{qfc_v1_notification_settings:{
     enabled:true,onSuccess:true,onInterrupted:true,
-    sound:'double',soundDuration:'10',visibility:'persistent'
+    sound:'double',soundDuration:'10',soundVolume:85,visibility:'persistent'
   }},session:{},notices:[],focused:[]};
   const w=makeWorker(shared);
   await w.send('start','audio-run-12345678');
@@ -214,6 +214,7 @@ test('custom chime uses silent desktop notification and only one offscreen docum
   assert.equal(shared.audioOptions.reasons[0],'AUDIO_PLAYBACK');
   assert.equal(shared.audioMessages[0].sound,'double');
   assert.equal(shared.audioMessages[0].duration,'10');
+  assert.equal(shared.audioMessages[0].volume,85);
 
   await w.send('start','second-run-12345678');
   await w.send('success','second-run-12345678',{verifiedCount:1});
@@ -225,7 +226,7 @@ test('notifications opt-out, disabled outcomes and silent custom sound are respe
   const shared={local:{},session:{},notices:[],focused:[]};
   const w=makeWorker(shared);
   shared.local.qfc_v1_notification_settings={
-    enabled:false,onSuccess:true,onInterrupted:true,sound:'alert',soundDuration:'20',visibility:'persistent'
+    enabled:false,onSuccess:true,onInterrupted:true,sound:'alert',soundDuration:'20',soundVolume:75,visibility:'persistent'
   };
   await w.send('start','disabled-run-123456');
   await w.send('success','disabled-run-123456',{verifiedCount:1});
@@ -246,11 +247,14 @@ test('notifications opt-out, disabled outcomes and silent custom sound are respe
 });
 test('sound preview validates values, ignores foreign origins and keeps queue RPC responsive',async()=>{
   const w=makeWorker();
-  const accepted=await w.rpc('previewSound',{sound:'soft',duration:'5'});
+  const accepted=await w.rpc('previewSound',{sound:'soft',duration:'5',volume:75});
   assert.equal(accepted.data.played,true);
   assert.equal(w.shared.audioMessages[0].sound,'soft');
-  assert.equal((await w.rpc('previewSound',{sound:'untrusted',duration:'20'})).data.played,false);
-  assert.equal((await w.rpc('previewSound',{sound:'soft',duration:'1000'})).data.played,false);
+  assert.equal(w.shared.audioMessages[0].volume,75);
+  assert.equal((await w.rpc('previewSound',{sound:'untrusted',duration:'20',volume:75})).data.played,false);
+  assert.equal((await w.rpc('previewSound',{sound:'soft',duration:'1000',volume:75})).data.played,false);
+  assert.equal((await w.rpc('previewSound',{sound:'soft',duration:'60',volume:101})).data.played,false);
+  assert.equal((await w.rpc('previewSound',{sound:'soft',duration:'2',volume:0})).data.played,false);
   assert.equal(w.shared.audioMessages.length,1);
   assert.equal((await w.rpc('notificationPermission')).data,'granted');
   assert.equal((await w.unauthorized('start')).ok,false);
@@ -259,7 +263,7 @@ test('sound preview validates values, ignores foreign origins and keeps queue RP
 test('invalid notification preference values return conservative defaults',async()=>{
   const shared={local:{qfc_v1_notification_settings:{
     enabled:'false',onSuccess:'false',onInterrupted:1,
-    sound:'audio-from-the-internet',soundDuration:'99999',visibility:'endless'
+    sound:'audio-from-the-internet',soundDuration:'99999',soundVolume:999,visibility:'endless'
   }},session:{},notices:[],focused:[]};
   const w=makeWorker(shared);
   await w.send('start','defaults-run-1234');
@@ -268,4 +272,36 @@ test('invalid notification preference values return conservative defaults',async
   assert.equal(shared.notices[0].options.silent,false);
   assert.equal(shared.notices[0].options.requireInteraction,false);
   assert.equal(shared.audioMessages,undefined);
+});
+
+test('explicit silent test notification does not register a run or produce custom audio',async()=>{
+  const w=makeWorker();
+  const result=await w.rpc('testNotification');
+  assert.equal(result.data.requested,true);
+  assert.equal(w.shared.notices.length,1);
+  assert.equal(w.shared.notices[0].options.silent,true);
+  assert.match(w.shared.notices[0].options.title,/test notification/);
+  assert.deepEqual(Object.keys(w.shared.session),[]);
+  assert.equal(w.shared.audioMessages,undefined);
+  w.shared.local.qfc_v1_notification_settings={enabled:false};
+  assert.equal((await w.rpc('testNotification')).data.requested,false);
+  assert.equal(w.shared.notices.length,1);
+});
+test('zero custom volume never opens audio and stopping never creates a document',async()=>{
+  const shared={local:{qfc_v1_notification_settings:{
+    enabled:true,onSuccess:true,onInterrupted:true,sound:'soft',
+    soundDuration:'60',soundVolume:0,visibility:'system'
+  }},session:{},notices:[],focused:[]};
+  const w=makeWorker(shared);
+  assert.equal((await w.rpc('stopSound')).data.stopped,true);
+  assert.equal(shared.audioCreated,undefined);
+  await w.send('start','mute-run-12345678');
+  await w.send('success','mute-run-12345678',{verifiedCount:1});
+  assert.equal(shared.notices.length,1);
+  assert.equal(shared.notices[0].options.silent,true);
+  assert.equal(shared.audioCreated,undefined);
+  assert.equal((await w.rpc('previewSound',{sound:'soft',duration:'60',volume:0})).data.played,false);
+  assert.equal((await w.rpc('previewSound',{sound:'soft',duration:'60',volume:100})).data.played,true);
+  assert.equal((await w.rpc('stopSound')).data.stopped,true);
+  assert.equal(shared.audioMessages.at(-1).action,'stop');
 });

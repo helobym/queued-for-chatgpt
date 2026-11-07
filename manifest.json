@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Queued for ChatGPT",
   "short_name": "Queued for ChatGPT",
-  "version": "1.2.9",
-  "description": "Lightweight ChatGPT queues, compact workflows, and customizable desktop notification alerts.",
+  "version": "1.2.10",
+  "description": "Lightweight ChatGPT queues and workflows with accessible, adjustable desktop notification alerts.",
   "permissions": [
     "storage",
     "notifications",

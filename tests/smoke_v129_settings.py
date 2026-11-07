@@ -1,4 +1,4 @@
-"""v1.2.9 compact workflow disclosure and in-panel notification preferences."""
+"""v1.2.10 compact workflow disclosure and lightweight notification settings."""
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -28,7 +28,7 @@ with sync_playwright() as playwright:
         async sendMessage(message){
           if(message.app==='qfc-audio-v1'){
             window.__audio.push(message);
-            return {played:true};
+            return message.action==='stop' ? {stopped:true} : {played:true};
           }
           return new Promise(resolve=>{
             let handled=false;
@@ -93,32 +93,55 @@ with sync_playwright() as playwright:
     assert page.locator('.qfc-nav').is_hidden()
     assert page.locator('#qfc-workflows-view').is_hidden()
     assert page.locator('#qfc-notify-enabled').is_checked()
+    assert page.locator('#qfc-notify-enabled-state').inner_text() == 'ON'
+    assert page.locator('.qfc-switch-track').first.bounding_box()['width'] >= 40
     assert page.locator('#qfc-notify-sound').input_value() == 'system'
+    assert page.locator('#qfc-notify-duration-mode').is_disabled()
     assert page.locator('#qfc-notify-duration').is_disabled()
     assert page.locator('#qfc-test-sound').is_disabled()
+
     page.locator('#qfc-notify-sound').select_option('double')
-    page.locator('#qfc-notify-duration').select_option('10')
+    page.locator('#qfc-notify-duration-mode').select_option('timed')
+    page.locator('#qfc-notify-duration').fill('14')
+    page.locator('#qfc-notify-duration').press('Tab')
+    page.locator('#qfc-notify-volume').evaluate("""el => {
+      el.value='85';
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      el.dispatchEvent(new Event('change',{bubbles:true}));
+    }""")
     page.locator('#qfc-notify-visibility').select_option('persistent')
     page.locator('#qfc-notify-interrupted').uncheck()
+    assert page.locator('#qfc-notify-interrupted-state').inner_text() == 'OFF'
     page.wait_for_function("""async()=>{
       const v=(await chrome.storage.local.get('qfc_v1_notification_settings')).qfc_v1_notification_settings;
-      return v?.sound==='double' && v?.soundDuration==='10' &&
-        v?.visibility==='persistent' && v?.onInterrupted===false;
+      return v?.sound==='double' && v?.soundDuration==='14' &&
+        v?.soundVolume===85 && v?.visibility==='persistent' && v?.onInterrupted===false;
     }""")
+    page.wait_for_function("document.querySelector('#qfc-settings-save-status').textContent==='Saved'")
     page.locator('#qfc-test-sound').click()
-    page.wait_for_function('window.__audio.length === 1')
-    assert page.evaluate('window.__audio[0].duration') == '10'
+    page.wait_for_function("window.__audio.some(x=>x.action==='play')")
+    assert page.evaluate("window.__audio.find(x=>x.action==='play').duration") == '2'
+    assert page.evaluate("window.__audio.find(x=>x.action==='play').volume") == 85
     assert page.evaluate('window.__offscreenCreates') == 1
     assert page.evaluate('window.__audioDocumentOptions.reasons[0]') == 'AUDIO_PLAYBACK'
+    assert 'requested' in page.locator('#qfc-notify-preview').inner_text()
 
-    # A storage update from another tab should refresh the open Settings view.
+    page.locator('#qfc-test-notification').click()
+    page.wait_for_function("window.__alerts.length===1")
+    assert page.evaluate('window.__alerts[0].opts.silent') is True
+    assert 'test notification' in page.evaluate('window.__alerts[0].opts.title')
+    page.evaluate("window.__alerts.length=0")
+
+    # A storage update from another tab refreshes the open Settings view.
     page.evaluate("""async()=>{
       const key='qfc_v1_notification_settings';
       const saved=(await chrome.storage.local.get(key))[key];
       await chrome.storage.local.set({[key]:{...saved,onSuccess:false}});
     }""")
     assert not page.locator('#qfc-notify-success').is_checked()
+    assert page.locator('#qfc-notify-success-state').inner_text() == 'OFF'
     page.locator('#qfc-notify-success').check()
+    page.wait_for_function("document.querySelector('#qfc-settings-save-status').textContent==='Saved'")
     page.locator('[data-action="settings-back"]').click()
     assert page.locator('#qfc-workflows-view').is_visible()
     assert page.locator('[data-action="toggle-workflow"]').get_attribute('aria-expanded') == 'true'
@@ -126,19 +149,36 @@ with sync_playwright() as playwright:
 
     page.locator('[data-action="start-workflow"]').click()
     page.wait_for_function(
-      "document.querySelector('#qfc-status').textContent.includes('Queue complete')",
-      timeout=45000)
+        "document.querySelector('#qfc-status').textContent.includes('Queue complete')",
+        timeout=45000)
     page.wait_for_function('window.__alerts.length === 1')
     notice=page.evaluate('window.__alerts[0].opts')
     assert notice['title'] == 'Workflow completed successfully',notice
     assert notice['silent'] is True
     assert notice['requireInteraction'] is True
     assert 'All 2 prompts finished' in notice['message']
-    page.wait_for_function('window.__audio.length === 2')
+    page.wait_for_function("window.__audio.filter(x=>x.action==='play').length===2")
     assert page.evaluate('window.__offscreenCreates') == 1
 
+    # A failed write must restore the last confirmed settings and report failure.
     page.locator('[data-action="open-settings"]').click()
+    page.evaluate("""()=>{
+      const original=chrome.storage.local.set.bind(chrome.storage.local);
+      let fail=true;
+      chrome.storage.local.set=async changes=>{
+        if(fail && 'qfc_v1_notification_settings' in changes){
+          fail=false;throw new Error('Simulated storage failure');
+        }
+        return original(changes);
+      };
+    }""")
+    page.locator('#qfc-notify-success').uncheck()
+    page.wait_for_function(
+        "document.querySelector('#qfc-settings-save-status').textContent.includes('Save failed')")
+    assert page.locator('#qfc-notify-success').is_checked()
+
     page.locator('#qfc-notify-enabled').uncheck()
+    assert page.locator('#qfc-notify-enabled-state').inner_text() == 'OFF'
     assert page.locator('#qfc-notify-sound').is_disabled()
     assert page.locator('#qfc-test-sound').is_disabled()
     page.wait_for_function("""async()=>{
@@ -151,12 +191,12 @@ with sync_playwright() as playwright:
       await chrome.runtime.sendMessage({...base,action:'success',verifiedCount:1});
     }""")
     assert page.evaluate('window.__alerts.length') == 1
-    assert page.evaluate('window.__audio.length') == 2
+    assert page.evaluate("window.__audio.filter(x=>x.action==='play').length") == 2
     assert not page.locator('.qfc-nav').is_visible()
     page.locator('[data-action="settings-back"]').click()
     page.locator('[data-action="tab-queue"]').click()
     assert page.locator('#qfc-queue-view').is_visible()
     assert page.locator('#qfc-status').is_visible()
 
-    print('PASS: compact workflow chevron, persisted settings, cross-tab update, preview, silent custom alerts, disable')
+    print('PASS: settings switches, bounded volume/duration, preview, storage rollback and notification lifecycle')
     browser.close()
