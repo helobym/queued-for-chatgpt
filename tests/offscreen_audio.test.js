@@ -113,8 +113,7 @@ test('offscreen audio rejects untrusted requests, invalid durations and volume',
 test('audio resume failure closes resources without leaving a timer',async()=>{
   const p=player({rejectResume:true});
   assert.equal(p.play('soft','2').response.played,true,'scheduling acknowledged');
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise(resolve=>setImmediate(resolve));
   assert.equal(p.contexts[0].closed,true);
   assert.equal(p.timers.size,0);
 });
