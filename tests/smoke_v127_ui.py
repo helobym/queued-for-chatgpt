@@ -96,7 +96,7 @@ with sync_playwright() as playwright:
     }""")
     page.wait_for_timeout(80)
     assert page.evaluate('window.__qfcIdleClosest') == 0
-    page.evaluate('Element.prototype.closest = window.__qfcOldClosest')
+    page.evaluate('() => { Element.prototype.closest = window.__qfcOldClosest; }')
 
     # Start Workflow must run normally, without changing the selected panel page.
     page.locator('[data-action="start-workflow"]').click()

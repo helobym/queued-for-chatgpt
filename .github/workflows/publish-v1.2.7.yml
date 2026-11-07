@@ -76,6 +76,7 @@ jobs:
 
       - name: Run simulated Chromium reliability regressions
         run: |
+          python3 tests/smoke_v127_ui.py
           python3 tests/smoke_send_receipt_safety.py
           python3 tests/smoke_app_shell.py
           python3 tests/smoke_first_reply_fallback.py
@@ -87,7 +88,6 @@ jobs:
           python3 tests/smoke_workflows.py
           python3 tests/smoke_draggable_panel.py
           python3 tests/smoke_browser.py
-          python3 tests/smoke_v127_ui.py
 
       - name: Create unpacked-extension ZIP
         shell: bash
