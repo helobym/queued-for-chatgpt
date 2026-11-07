@@ -172,7 +172,8 @@ with sync_playwright() as playwright:
         return original(changes);
       };
     }""")
-    page.locator('#qfc-notify-success').uncheck()
+    # A failed save immediately restores the checkbox, so use click (not uncheck).
+    page.locator('#qfc-notify-success').click()
     page.wait_for_function(
         "document.querySelector('#qfc-settings-save-status').textContent.includes('Save failed')")
     assert page.locator('#qfc-notify-success').is_checked()
