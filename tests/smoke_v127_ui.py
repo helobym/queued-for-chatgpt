@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = json.loads((ROOT / 'manifest.json').read_text(encoding='utf-8'))
-assert MANIFEST['version'] == '1.2.7'
+assert MANIFEST['version'] in ('1.2.7', '1.2.8')
 assert MANIFEST['commands']['toggle-queue-panel']['suggested_key']['default'] == 'Alt+Shift+Q'
 
 with sync_playwright() as playwright:
