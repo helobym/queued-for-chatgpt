@@ -6,12 +6,21 @@ const vm = require('node:vm');
 const path = require('node:path');
 const base = path.resolve(__dirname, '..');
 function createWorker(stored = {}) {
-  let listener;
+  let listener, commandListener, rejectSend = false;
+  const sent = [];
   const db = JSON.parse(JSON.stringify(stored));
   const ext = { id: 'test-extension' };
   const context = vm.createContext({
     URL, Date, Promise, Math, Set, console, crypto: require('node:crypto').webcrypto,
     chrome: {
+      commands: { onCommand: { addListener(fn) { commandListener = fn; } } },
+      tabs: {
+        async query() { return [{id: 42}]; },
+        async sendMessage(id, message) {
+          if (rejectSend) throw new Error('No receiving end');
+          sent.push({id, message});
+        }
+      },
       runtime: { id: ext.id, onMessage: { addListener(fn) { listener = fn; } } },
       storage: { local: {
         async get(keys) { const select = Array.isArray(keys) ? keys : [keys]; return Object.fromEntries(select.map(k => [k, db[k]])); },
@@ -21,7 +30,9 @@ function createWorker(stored = {}) {
   });
   context.importScripts = (...paths) => paths.forEach(file => vm.runInContext(fs.readFileSync(path.join(base, file), 'utf8'), context, { filename: file }));
   vm.runInContext(fs.readFileSync(path.join(base, 'background.js'), 'utf8'), context, { filename: 'background.js' });
-  return { db, message(payload) {
+  return { db, sent, command(command, tab) { return commandListener(command, tab); },
+    rejectReceiver() { rejectSend = true; },
+    message(payload) {
     return new Promise(resolve => {
       const allowed = listener({ app: 'qfc-v1.1', ...payload }, { id: ext.id, frameId: 0, url: 'https://chatgpt.com/c/mychat' }, resolve);
       if (!allowed) resolve({ ok: false, error: 'blocked' });
@@ -91,4 +102,17 @@ test('temporary chat migration preserves workflow origin and completed preview',
   assert.equal(retry.data.items[0].workflow.id, origin.id);
   assert.equal(retry.data.lastCompleted.preview, preview.preview);
   assert.equal((await bg.message({ command: 'getQueue', route: 'chat:mychat' })).data.lastCompleted.workflow.step, 1);
+});
+
+test('native panel shortcut targets one tab, ignores unknown commands and falls back to focused tab', async () => {
+  const bg = createWorker();
+  await bg.command('another-command', {id: 7});
+  assert.equal(bg.sent.length, 0);
+  await bg.command('toggle-queue-panel', {id: 7});
+  assert.deepEqual(bg.sent[0], {id: 7, message: {app:'qfc-ui-v1',action:'toggle-panel'}});
+  await bg.command('toggle-queue-panel');
+  assert.equal(bg.sent[1].id, 42);
+  bg.rejectReceiver();
+  await assert.doesNotReject(bg.command('toggle-queue-panel', {id: 9}));
+  assert.equal(bg.sent.length, 2);
 });

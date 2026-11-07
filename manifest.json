@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Queued for ChatGPT",
   "short_name": "Queued for ChatGPT",
-  "version": "1.2.6",
-  "description": "Lightweight ChatGPT queues with saved workflows, Project support, live dock status, expandable workflows, prompt Copy and recent activity and multi-tab safety.",
+  "version": "1.2.7",
+  "description": "Lightweight ChatGPT queues, saved workflows, shortcut panel toggle, collapsible recent activity, live status and safe sequential sending.",
   "permissions": [
     "storage"
   ],
@@ -30,5 +30,13 @@
   },
   "background": {
     "service_worker": "background.js"
+  },
+  "commands": {
+    "toggle-queue-panel": {
+      "suggested_key": {
+        "default": "Alt+Shift+Q"
+      },
+      "description": "Open or close the Queued for ChatGPT panel"
+    }
   }
 }

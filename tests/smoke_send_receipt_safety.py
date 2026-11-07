@@ -17,7 +17,7 @@ def open_queue(browser):
       let listener;
       chrome.runtime = {
         id: 'mock-qfc-extension',
-        onMessage: { addListener(fn) { listener = fn; } },
+        onMessage: { addListener(fn){if(!listener) listener=fn; else window.__qfcUiListener=fn;} },
         sendMessage(msg) { return new Promise(resolve =>
           listener(msg, {id: 'mock-qfc-extension', frameId: 0,
             url: 'https://chatgpt.com/c/receipt-test'}, resolve)); }
@@ -25,6 +25,10 @@ def open_queue(browser):
       Object.defineProperty(navigator, 'locks', {
         value: {request: async (_name, _options, callback) => callback({})}
       });
+    }""")
+    page.evaluate("""() => {
+      chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+      chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
     }""")
     page.add_script_tag(path=str(ROOT / 'background.js'))
     # Shorten only the simulated receipt deadline.

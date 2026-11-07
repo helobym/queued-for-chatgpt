@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.5 — local event-driven, single-writer storage coordinator. */
+/* Queued for ChatGPT v1.2.7 — serialized coordinator and native panel shortcut. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;
@@ -105,4 +105,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     throw new Error('Unknown coordinator command.');
   }).then(data => sendResponse({ ok: true, data }), error => sendResponse({ ok: false, error: String(error?.message || 'Coordinator error').slice(0, 200) }));
   return true;
+});
+
+
+// Chrome Commands is event-driven: no persistent worker or tab polling.
+chrome.commands.onCommand.addListener(async (command, tab) => {
+  if (command !== 'toggle-queue-panel') return;
+  try {
+    const target = Number.isInteger(tab?.id) ? tab :
+      (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
+    if (!Number.isInteger(target?.id)) return;
+    // Only an installed ChatGPT content script accepts this message. A missing
+    // receiver (other websites, closed or unloaded tabs) is a harmless no-op.
+    await chrome.tabs.sendMessage(target.id, { app: 'qfc-ui-v1', action: 'toggle-panel' });
+  } catch (_) { /* No receiver or tab disappeared. Do not affect queue execution. */ }
 });

@@ -1,0 +1,158 @@
+name: Publish v1.2.7 GitHub Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v1.2.7.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout v1.2.7 source
+        uses: actions/checkout@v4
+
+      - name: Set up Python for simulated browser tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run JavaScript queue and coordinator tests
+        run: |
+          node --test tests/*.test.js
+          node --check content.js
+          node --check background.js
+          node --check core.js
+          node --check coordinator.js
+
+      - name: Check Python regression script syntax and preview asset
+        run: |
+          python3 -m compileall -q tests
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+          ElementTree.parse('screenshots/workflows-v1.2.7.svg')
+          ElementTree.parse('screenshots/queue-v1.2.7.svg')
+          assert 'Recent activity' in Path('content.js').read_text(encoding='utf-8')
+          assert 'hasNewUserReceipt' in Path('content.js').read_text(encoding='utf-8')
+          assert 'lastCompleted' in Path('coordinator.js').read_text(encoding='utf-8')
+          assert 'releases/tag/v1.2.7' in Path('README.md').read_text(encoding='utf-8')
+          assert '+ Load' in Path('content.js').read_text(encoding='utf-8')
+          assert 'load-workflow' in Path('content.js').read_text(encoding='utf-8')
+          assert 'projectLandingId' in Path('content.js').read_text(encoding='utf-8')
+          assert "case 'copy':" in Path('content.js').read_text(encoding='utf-8')
+          assert "case 'copy-workflow-step':" in Path('content.js').read_text(encoding='utf-8')
+          assert "function dockDisplay()" in Path('content.js').read_text(encoding='utf-8')
+          assert "state.senderLockRoute = route;" in Path('content.js').read_text(encoding='utf-8')
+          assert "qfc-workflow-details" in Path('content.js').read_text(encoding='utf-8')
+          assert "qfc-activity-details" in Path('content.js').read_text(encoding='utf-8')
+          assert "qfc-ui-v1" in Path('background.js').read_text(encoding='utf-8')
+          import json
+          manifest = json.loads(Path('manifest.json').read_text(encoding='utf-8'))
+          assert manifest['commands']['toggle-queue-panel']['suggested_key']['default'] == 'Alt+Shift+Q'
+          PY
+
+      - name: Install Chromium for simulated browser tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install playwright==1.56.0
+          python3 -m playwright install --with-deps chromium
+          CHROME="$(find "$HOME/.cache/ms-playwright" -type f \( -path '*/chrome-linux64/chrome' -o -path '*/chrome-linux/chrome' \) | head -n 1)"
+          test -n "$CHROME"
+          sudo ln -sf "$CHROME" /usr/bin/chromium
+
+      - name: Run simulated Chromium reliability regressions
+        run: |
+          python3 tests/smoke_send_receipt_safety.py
+          python3 tests/smoke_app_shell.py
+          python3 tests/smoke_first_reply_fallback.py
+          python3 tests/smoke_workflow_load_during_run.py
+          python3 tests/smoke_workflow_new_chat.py
+          python3 tests/smoke_workflow_direct_start_safety.py
+          python3 tests/smoke_project_workflows.py
+          python3 tests/smoke_queue_copy.py
+          python3 tests/smoke_workflows.py
+          python3 tests/smoke_draggable_panel.py
+          python3 tests/smoke_browser.py
+          python3 tests/smoke_v127_ui.py
+
+      - name: Create unpacked-extension ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import zipfile
+
+          root = pathlib.Path('.')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+          assert manifest['version'] == '1.2.7', 'This workflow only publishes v1.2.7'
+          required = [
+              'manifest.json', 'background.js', 'content.js', 'content.css',
+              'core.js', 'coordinator.js', 'LICENSE', 'NOTICE.txt',
+              'PRIVACY.md', 'README.md', 'UPGRADE-CHECKLIST.txt'
+          ]
+          required += [str(f) for f in sorted((root / 'icons').glob('*.png'))]
+          assert len(required) >= 14, 'Extension icons are missing'
+          archive = pathlib.Path('queued-for-chatgpt-v1.2.7.zip')
+          with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as zipped:
+              for name in required:
+                  file = root / name
+                  assert file.is_file(), f'Missing {name}'
+                  zipped.write(file, arcname=name)
+          with zipfile.ZipFile(archive) as zipped:
+              assert zipped.testzip() is None, 'Corrupt ZIP'
+              assert 'manifest.json' in zipped.namelist(), 'Manifest must be at ZIP root'
+          checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+          pathlib.Path('queued-for-chatgpt-v1.2.7.zip.sha256').write_text(
+              f'{checksum}  {archive.name}\n', encoding='utf-8')
+          print(f'Packaged {archive} ({archive.stat().st_size} bytes); SHA256 {checksum}')
+          PY
+
+      - name: Publish v1.2.7 with installation package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/qfc-release-notes.md <<'NOTES'
+          ## Queued for ChatGPT v1.2.7
+
+          An unofficial, independently developed Chrome / Chromebook extension for saved prompt queues and sequential ChatGPT workflows.
+
+          ### What's new
+          - **Workflow view remains selected:** Start Workflow and + Load do not switch to Queue. Monitor progress in the dock while leaving workflow search, expansion and scroll position intact.
+          - **Native panel hotkey:** Press Alt+Shift+Q to open or close the floating panel in the active ChatGPT tab. Customize the shortcut at `chrome://extensions/shortcuts`.
+          - **Expandable Recent Activity:** Collapsed by default; expand to view Current/Previous prompt summaries and workflow step attribution, without changing execution.
+          - **Lighter UI processing:** Idle DOM callbacks skip expensive assistant checks, and hidden Queue/Workflows lists are rendered when needed rather than rebuilt for every queue update.
+          - **Safety retained:** Serialized local storage, per-conversation sender locks, safe receipt and response-completion checks, New Chat / Project isolation and manual recovery remain unchanged. No new broad permissions or storage migration.
+
+          ### Install or upgrade
+          1. Download **queued-for-chatgpt-v1.2.7.zip** from the Assets section and extract it.
+          2. At `chrome://extensions`, use **Load unpacked** and select the extracted folder containing `manifest.json`.
+          3. To upgrade without losing local extension storage, keep the same installed folder and extension ID; replace its files, press **Reload** in Chrome, and refresh ChatGPT tabs. Export important workflows first.
+          4. On `chatgpt.com`, use the **☷ Queue** dock or **Alt+Shift+Q** to open the panel.
+
+          ### Testing notes
+          Automated JavaScript and simulated Chromium tests cover queue safety, Projects, New Chat, native command dispatch, activity disclosure and workflow view retention. Live ChatGPT account compatibility and actual Chromebook memory/CPU savings remain to be measured.
+
+          Source: [README](https://github.com/helobym/queued-for-chatgpt#readme) · [Privacy](https://github.com/helobym/queued-for-chatgpt/blob/main/PRIVACY.md) · [MIT License](https://github.com/helobym/queued-for-chatgpt/blob/main/LICENSE)
+          NOTES
+          if gh release view v1.2.7 >/dev/null 2>&1; then
+            echo 'v1.2.7 release already exists; refusing to overwrite tagged release assets.'
+            exit 0
+          fi
+          gh release create v1.2.7 queued-for-chatgpt-v1.2.7.zip queued-for-chatgpt-v1.2.7.zip.sha256 \
+            --title 'Queued for ChatGPT v1.2.7' \
+            --notes-file /tmp/qfc-release-notes.md \
+            --target "$GITHUB_SHA" \
+            --latest

@@ -33,7 +33,7 @@ with sync_playwright() as p:
       let handler;
       chrome.runtime = {
         id: 'mock-qfc-extension',
-        onMessage: { addListener(fn) { handler = fn; } },
+        onMessage: { addListener(fn){if(!handler) handler=fn; else window.__qfcUiListener=fn;} },
         sendMessage(request) {
           return new Promise(resolve => handler(request,
             {id:'mock-qfc-extension',frameId:0,url:'https://chatgpt.com/'},resolve));
@@ -43,6 +43,10 @@ with sync_playwright() as p:
         value: { request: async (_name, _opts, cb) => cb({}) }
       });
     }''')
+    page.evaluate("""() => {
+      chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+      chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
+    }""")
     page.add_script_tag(path=str(PROJECT / 'background.js'))
     content = (PROJECT / 'content.js').read_text(encoding='utf-8')
     content = content.replace('function isNewChatPage() {',

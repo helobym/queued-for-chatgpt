@@ -14,7 +14,7 @@ def attach(page):
       QFC.conversationId = () => 'chat:test';
       window.importScripts = () => {};
       let listener;
-      chrome.runtime = {id:'mock-qfc-extension',onMessage:{addListener(fn){listener=fn;}},
+      chrome.runtime = {id:'mock-qfc-extension',onMessage:{addListener(fn){if(!listener) listener=fn; else window.__qfcUiListener=fn;}},
         sendMessage(msg){return new Promise(resolve=>listener(msg,
           {id:'mock-qfc-extension',frameId:0,url:'https://chatgpt.com/c/test'}, resolve));}};
       window.__allowLock = true;
@@ -22,6 +22,10 @@ def attach(page):
         request:async (_name,_opts,cb)=>cb(window.__allowLock ? {} : null)
       }});
     }''')
+    page.evaluate("""() => {
+      chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+      chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
+    }""")
     page.add_script_tag(path=str(P / 'background.js'))
     page.add_script_tag(path=str(P / 'content.js'))
     page.locator('.qfc-dock').click()
@@ -62,6 +66,7 @@ with sync_playwright() as p:
     # Accepting explicitly sends the existing prompt FIRST, then workflow steps.
     page.once('dialog', lambda dialog: dialog.accept())
     page.locator('[data-action="start-workflow"]').click()
+    assert page.locator('#qfc-workflows-view').is_visible()
     page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Queue complete')", timeout=55000)
     sent = page.locator('[data-message-author-role="user"] .whitespace-pre-wrap').all_inner_texts()
     assert sent[-3:] == ['Existing pending prompt', 'Workflow step 1', 'Workflow step 2'], sent
@@ -92,7 +97,7 @@ with sync_playwright() as p:
       return chrome.runtime.sendMessage({app:'qfc-v1.1',command:'queue',route,
         operationId:'manual-set-sending-test',mutation:{type:'sending',id}});
     }''')
-    page.wait_for_function("document.querySelector('#qfc-queue-items').textContent.includes('Sending')")
+    page.wait_for_function("document.querySelector('.qfc-dock').dataset.phase === 'check'")
     page.locator('[data-action="start-workflow"]').click()
     page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Review uncertain queued prompts')")
     assert page.locator('#qfc-count').inner_text() == '1'

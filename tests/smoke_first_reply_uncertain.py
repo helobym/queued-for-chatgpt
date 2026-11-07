@@ -26,12 +26,16 @@ with sync_playwright() as p:
       window.importScripts = () => {};
       let handler;
       chrome.runtime = {
-        id:'mock-qfc-extension',onMessage:{addListener(fn){handler=fn;}},
+        id:'mock-qfc-extension',onMessage:{addListener(fn){if(!handler) handler=fn; else window.__qfcUiListener=fn;}},
         sendMessage(request){return new Promise(resolve=>handler(request,
           {id:'mock-qfc-extension',frameId:0,url:'https://chatgpt.com/'},resolve));}
       };
       Object.defineProperty(navigator,'locks',{value:{request:async (_n,_o,cb)=>cb({})}});
     }''')
+    page.evaluate("""() => {
+      chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+      chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
+    }""")
     page.add_script_tag(path=str(PROJECT/'background.js'))
     content=(PROJECT/'content.js').read_text(encoding='utf-8')
     content=content.replace('function isNewChatPage() {',

@@ -28,7 +28,7 @@ try:
           let workerListener;
           window.chrome.runtime = {
             id: 'mock-qfc-extension',
-            onMessage: { addListener(fn) { workerListener = fn; } },
+            onMessage: { addListener(fn){if(!workerListener) workerListener=fn; else window.__qfcUiListener=fn;} },
             sendMessage(message) {
               return new Promise(resolve => {
                 workerListener(message, { id: 'mock-qfc-extension', frameId: 0, url: 'https://chatgpt.com/' }, resolve);
@@ -37,6 +37,10 @@ try:
           };
           Object.defineProperty(navigator, 'locks', { value: { request: async (_name, _opts, callback) => callback({}) } });
         }''')
+        page.evaluate("""() => {
+          chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+          chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
+        }""")
         page.add_script_tag(path=str(PROJECT / 'background.js'))
         # about:blank has no '/' pathname; use a mock home-page predicate only in this test.
         content = (PROJECT / 'content.js').read_text(encoding='utf-8')

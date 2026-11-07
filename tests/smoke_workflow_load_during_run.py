@@ -17,13 +17,17 @@ with sync_playwright() as p:
       let listener;
       chrome.runtime = {
         id: 'mock-qfc-extension',
-        onMessage: {addListener(fn) {listener = fn;}},
+        onMessage: {addListener(fn){if(!listener) listener=fn; else window.__qfcUiListener=fn;}},
         sendMessage(message) {return new Promise(resolve => listener(message,
           {id: 'mock-qfc-extension', frameId: 0, url: 'https://chatgpt.com/c/load-test'}, resolve));}
       };
       Object.defineProperty(navigator, 'locks', {value: {
         request: async (_name, _options, callback) => callback({})
       }});
+    }""")
+    page.evaluate("""() => {
+      chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+      chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
     }""")
     page.add_script_tag(path=str(P / 'background.js'))
     page.add_script_tag(path=str(P / 'content.js'))
@@ -40,6 +44,9 @@ with sync_playwright() as p:
 
     # Load into a paused/empty queue: do not start sending.
     page.locator('[data-action="load-workflow"]').click()
+    page.wait_for_function("document.querySelector('#qfc-count').textContent === '2'")
+    assert page.locator('#qfc-workflows-view').is_visible()
+    page.locator('[data-action="tab-queue"]').click()
     page.locator('#qfc-queue-items').get_by_text('Workflow second').wait_for()
     assert page.locator('#qfc-count').inner_text() == '2'
     assert page.locator('#qfc-pause').is_disabled()
@@ -67,7 +74,12 @@ with sync_playwright() as p:
     # Append during the active first response. Its runner must pick up the new tail.
     page.locator('[data-action="tab-workflows"]').click()
     page.locator('[data-action="load-workflow"]').click()
-    page.locator('#qfc-queue-items').get_by_text('Workflow second').wait_for()
+    assert page.locator('#qfc-workflows-view').is_visible()
+    page.wait_for_function("""async () => {
+      const result = await chrome.runtime.sendMessage({app:'qfc-v1.1',
+        command:'getQueue',route:'chat:load-test'});
+      return result.data.items.some(item => item.text === 'Workflow second');
+    }""")
     assert page.locator('#qfc-pause').is_enabled()
     assert page.locator('.qfc-dock').get_attribute('data-phase') == 'running'
     assert 'left' in page.locator('#qfc-dock-count').inner_text()
@@ -80,6 +92,8 @@ with sync_playwright() as p:
     assert page.locator('#qfc-count').inner_text() == '0'
     assert page.locator('.qfc-dock').get_attribute('data-phase') == 'idle'
     assert page.locator('#qfc-activity-current').is_hidden()
+    assert page.locator('#qfc-activity-details').is_hidden()
+    page.locator('[data-action="toggle-activity"]').click()
     previous = page.locator('#qfc-activity-previous').inner_text()
     assert 'Workflow second' in previous and 'Step 2/2' in previous, previous
     print('PASS: Load is passive when idle and active runner sends appended workflow in order')

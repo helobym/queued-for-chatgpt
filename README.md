@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.6 — Live Dock and Expandable Workflows
+# Queued for ChatGPT v1.2.7 — Lightweight Monitoring and Quick Panel Access
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.6](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.6)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.7](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.7)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.7:** Start Workflow and + Load keep the Workflows page open; **Alt+Shift+Q** toggles the floating panel (reassign at `chrome://extensions/shortcuts`); Recent Activity is collapsed by default and expands on demand. Idle DOM work and hidden-list rendering are reduced without changing sender locks, prompt submission or response-confirmation safeguards.
 
 **New in v1.2.6:** The floating Queue dock now shows live Start/Running/Paused status and the number of prompts still pending, excluding the active prompt. Saved Workflows are collapsed by default, expand to show numbered full prompts, and provide a Copy button on each step. No new permissions, background polling, or storage migration required.
 
@@ -20,13 +22,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.6 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.6), expand **Assets**, and download **`queued-for-chatgpt-v1.2.6.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.7 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.7), expand **Assets**, and download **`queued-for-chatgpt-v1.2.7.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.6**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.7**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Look for the floating **☷ Queue** button near the bottom-right of the page. Click it to open Queue or Workflows.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -35,15 +37,23 @@ Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Ins
 
 ## Screenshots
 
-Both screenshots below are **illustrative v1.2.6 interface mockups** showing the live dock and expandable saved workflow steps alongside Recent Activity. They are not live ChatGPT captures and contain no real conversation data. Older screenshots remain in `screenshots/` for reference.
+Both screenshots below are **illustrative v1.2.7 interface mockups** showing the live dock, workflows and Recent Activity after the user expands it (activity starts collapsed by default). They are not live ChatGPT captures and contain no real conversation data. Older screenshots remain in `screenshots/` for reference.
 
 ### Queue
 
-![Queued for ChatGPT v1.2.6 — Queue panel with live status and Current / Previous activity](screenshots/queue-v1.2.6.svg)
+![Queued for ChatGPT v1.2.7 — Queue panel with live status and expanded Current / Previous activity](screenshots/queue-v1.2.7.svg)
 
 ### Saved Queue Workflows
 
-![Queued for ChatGPT v1.2.6 — Expandable workflows with individual prompt Copy actions](screenshots/workflows-v1.2.6.svg)
+![Queued for ChatGPT v1.2.7 — Workflows page remains open while running, with expanded activity](screenshots/workflows-v1.2.7.svg)
+
+## What changed in v1.2.7
+
+- **Stay in Workflows:** Start Workflow and + Load preserve the selected view, expanded steps, scroll position and search query. Choose Queue manually if you want to inspect or change queued prompts.
+- **Native Chrome shortcut:** Alt+Shift+Q opens or closes the floating panel in the active ChatGPT tab; reassign or troubleshoot conflicts at `chrome://extensions/shortcuts`. The shortcut does not start or pause jobs and is not available on unrelated websites.
+- **Collapsible Recent Activity:** compact by default, expandable using mouse or keyboard, with Current and Previous prompt previews and workflow attribution. The disclosure state stays while the page is open.
+- **Reduced idle overhead:** skip costly assistant-selector examination while idle and defer hidden Queue/Workflows DOM rebuilding. The DOM observer remains installed for ChatGPT route detection; this does not claim an established memory leak or measured RAM savings.
+- **Preserved safety:** queue and workflow data schema, Web Locks, safe send receipt verification and response-completion rules remain unchanged.
 
 ## What changed in v1.2.6
 
@@ -106,7 +116,7 @@ Both screenshots below are **illustrative v1.2.6 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.6.zip`** from the [v1.2.6 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.6) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.7.zip`** from the [v1.2.7 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.7) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs to load the new content script.
@@ -118,7 +128,7 @@ Changing the extension's ID (for example, by installing from a different folder)
 On a ChatGPT Project landing page (`/g/g-p-…/project`), **+ Load** and **▶ Start Workflow** are available just as on ordinary New Chat. Each Project keeps its own pending temporary queue in that browser tab until ChatGPT creates a conversation.
 
 1. Open **Workflows** and find the saved workflow you want.
-2. Click **+ Load**. All its steps append after the current queued prompts, preserving their order.
+2. Click **+ Load**. All its steps append after the current queued prompts, preserving their order. You remain on the Workflows page.
 3. If the queue is **paused or empty**, Load only prepares the queue. Open **Queue** and click **Start** when you want it to send.
 4. If the queue is **already running**, Load does not restart it. The active prompt finishes first, any previously pending prompts run next, and the loaded workflow steps follow automatically.
 
@@ -131,16 +141,20 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 1. Open a fresh ChatGPT **New Chat**, a **Project landing page**, or an existing conversation.
 2. Open the movable **☷ Queue** floating panel, then the **☷ Workflows** tab.
 3. Create or select a saved workflow containing at least one prompt.
-4. Click **▶ Start Workflow**. The view changes to **Queue** and begins automatic sequential sending.
+4. Click **▶ Start Workflow**. The panel stays on **Workflows** while sequential sending begins; click **Queue** manually to see the list.
 5. Watch the first run: the next prompt sends only after the previous response is confirmed finished.
 
 **If queued items already exist**, confirm the dialog to send those **before** the saved workflow steps, or cancel and manage the existing queue first. The extension does not silently clear, replace, or reorder existing prompts.
 
 **If the current queue is running**, pause it before clicking a different Start Workflow. If another tab/window is already processing the same chat, the start attempt will be refused without appending. Different conversations may still have independent queues.
 
-## Live dock, expandable workflows, and Copy
+## Live dock, panel shortcut, Recent Activity, expandable workflows, and Copy
 
 The floating **☷ Queue** button shows the active conversation's live status even when the panel is closed. When running, **N left** means N prompts are still pending *after* the active prompt. A final active prompt shows **Running · 0 left** until completion. A queue that is pending but not running shows **Paused · N pending**. **Check status** means an in-flight prompt may be handled in another tab or requires manual review; do not assume it is safe to retry. **Starting** means a sender lock has not yet been confirmed.
+
+Press **Alt+Shift+Q** to open or close the panel. The shortcut is provided by Chrome's Commands API, so it can be changed at `chrome://extensions/shortcuts` if it conflicts or is not assigned. This affects only the active ChatGPT tab's panel, not queue execution.
+
+**Recent Activity** remains a small heading until you choose **Expand**. It then shows Current and Previous previews with workflow name and step information. Click **Collapse** to hide details; closing/reopening the panel or switching Queue/Workflows leaves the disclosure state intact until the page reloads.
 
 On **Workflows**, each saved workflow starts collapsed. Click **Expand** to see all numbered prompts in a scrollable panel; click **Collapse** to hide them. Use **Copy** beside any saved workflow prompt to copy its full text without loading the workflow or changing queue execution. Workflow names and prompt contents are still searchable when collapsed.
 

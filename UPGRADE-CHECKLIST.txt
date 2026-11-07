@@ -1,39 +1,36 @@
-QUEUED FOR CHATGPT — v1.2.5 to v1.2.6
+QUEUED FOR CHATGPT — v1.2.6 to v1.2.7
 
 [ ] Export important Saved Queue Workflows as a JSON backup before upgrading.
-[ ] Let any running prompts finish or pause the queue. Review uncertain in-flight items.
-[ ] Keep the existing unpacked extension directory and extension ID.
-[ ] Download queued-for-chatgpt-v1.2.6.zip from the GitHub v1.2.6 Release (Assets).
-[ ] Extract it, then replace the extension files in that SAME directory.
-[ ] In chrome://extensions, press Reload and confirm version 1.2.6.
-[ ] Refresh all open ChatGPT tabs/windows (the old content script must be replaced).
-[ ] When three prompts are queued but stopped, confirm the dock displays "Paused · 3 pending".
-[ ] Start the queue and verify the dock shows "Running" with the count excluding the active prompt.
-[ ] Confirm the dock returns to Idle after the final response completes.
-[ ] In Workflows, verify saved workflows are collapsed by default and Expand/Collapse works independently.
-[ ] Expand a workflow, Copy individual full-length steps, and verify Copy doesn't start or change the queue.
-[ ] Keep an expanded workflow visible during an active queue and confirm it stays expanded.
-[ ] In Workflows, verify both "▶ Start Workflow" and "+ Load" appear.
-[ ] On a Project landing page, confirm + Load appends without sending and Start Workflow sends after explicit approval.
-[ ] Switch between two Project landing pages and confirm their pending queues stay separate.
-[ ] On Queue, use Copy for pending, sending and awaiting-response prompts; verify exact full text and no queue interruption.
-[ ] Click "+ Load" on a harmless workflow when the queue is stopped; confirm no prompt sends.
-[ ] Click Queue Start, and confirm the loaded prompts send sequentially.
-[ ] With two harmless prompts already running/queued, use "+ Load" to add a workflow.
-[ ] Confirm loaded steps append after the existing prompts and send automatically in sequence.
-[ ] Start two harmless prompts and confirm Recent activity shows Current and Previous correctly.
-[ ] Load a saved workflow during execution; confirm workflow ID and step attribution appear.
-[ ] Refresh the chat; confirm Previous remains and uncertain prompts are not marked completed.
-[ ] Send two harmless prompts; confirm that each waits for the prior response.
-[ ] Repeat an identical harmless prompt twice; verify two actual submitted user turns.
-[ ] If an attempted send leaves a draft, verify the extension does NOT auto-click Send again.
-[ ] Review uncertain items before Done or Retry; clear a stale draft before retrying.
-[ ] Check workflow backups, draggable panel, and New Chat remain functional.
+[ ] Let running prompts finish or pause the queue; manually review uncertain in-flight items.
+[ ] Keep the same installed unpacked-extension directory and extension ID.
+[ ] Download queued-for-chatgpt-v1.2.7.zip from the GitHub v1.2.7 Release (Assets).
+[ ] Extract, then replace matching files in the SAME installed extension directory.
+[ ] At chrome://extensions, click Reload and confirm version 1.2.7.
+[ ] Refresh all ChatGPT tabs/windows so outdated content scripts are replaced.
+[ ] On Workflows, click + Load when idle; verify Workflows stays visible and pending count increases without sending.
+[ ] Start a saved workflow; verify Workflows stays visible while the dock shows Running and the pending count.
+[ ] Expand a saved workflow; verify its expanded prompts, Copy feedback, search and scroll remain while running.
+[ ] Choose Queue manually; verify it displays the latest pending/in-flight records without stale items.
+[ ] On ChatGPT, press Alt+Shift+Q to open/close the panel and preserve the selected tab/drag position.
+[ ] If that shortcut is unavailable, check or reassign it at chrome://extensions/shortcuts.
+[ ] Verify the shortcut doesn't start/pause/retry a prompt, including while the queue is running.
+[ ] Confirm Recent Activity is collapsed by default; Expand shows Current and Previous and their workflow origin.
+[ ] Switch Queue/Workflows and close/reopen the panel; verify activity expansion state is preserved.
+[ ] Verify the panel fits on narrow and short windows after expanding/collapsing activity.
+[ ] Confirm the dock remains accurate while the panel is closed and when the queue completes.
+[ ] On New Chat and a Project landing page, confirm + Load remains passive and Start Workflow migrates safely after first send.
+[ ] Confirm queues remain isolated between different Project landing pages and conversations.
+[ ] Confirm a workflow loaded during an active run executes only after earlier pending prompts.
+[ ] Verify Copy works for pending, sending, awaiting and saved workflow prompts.
+[ ] Repeat two identical harmless prompts; verify two distinct ChatGPT user turns and no premature next send.
+[ ] If sending or completion is uncertain, verify the extension pauses rather than retrying automatically.
+[ ] Inspect Chrome Task Manager with the extension enabled and disabled on comparable chats for CPU/memory; record actual measurements.
 
 IMPORTANT:
-- "+ Load" never starts a stopped queue. It appends in order.
-- While the queue is running, Load does NOT restart or interrupt the active sender.
-- "▶ Start Workflow" still starts an idle queue and asks before running existing pending prompts.
-- Capacity limit: 100 queued prompts. A workflow is appended all-or-none.
-- Review uncertain sends manually; never blindly retry a prompt that might have been sent.
-- Live ChatGPT account and Chromebook resource use remain unverified.
+- + Load never starts an idle queue and never interrupts an active sender.
+- Start Workflow checks for pending items, confirmation, and sender-lock ownership before appending.
+- A workflow is appended atomically; 100 queued prompts is still the maximum.
+- Recent Activity is view-only; shortcut and disclosure do not mutate queue records.
+- A missing keyboard shortcut can be resolved in Chrome's extension shortcut settings.
+- This release does not change the local storage schema or require new broad permissions.
+- Live ChatGPT compatibility and Chromebook resource usage still require device testing.

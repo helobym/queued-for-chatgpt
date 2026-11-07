@@ -34,13 +34,17 @@ def install(page, stored=None):
       let listener;
       chrome.runtime = {
         id: 'mock-qfc-extension',
-        onMessage: {addListener(fn) {listener = fn;}},
+        onMessage: {addListener(fn){if(!listener) listener=fn; else window.__qfcUiListener=fn;}},
         sendMessage(msg) {return new Promise(resolve => listener(msg,
           {id:'mock-qfc-extension',frameId:0,url:location.href}, resolve));}
       };
       Object.defineProperty(navigator, 'locks', {configurable:true, value: {
         request: async (_name, _options, callback) => callback({})
       }});
+    }""")
+    page.evaluate("""() => {
+      chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+      chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
     }""")
     page.add_script_tag(path=str(ROOT / 'background.js'))
     if stored is not None:
@@ -69,6 +73,7 @@ with sync_playwright() as playwright:
     page.locator('[data-action="save-workflow-edit"]').click()
     page.locator('[data-action="load-workflow"]').click()
     page.wait_for_function("document.querySelector('#qfc-count').textContent === '2'")
+    assert page.locator('#qfc-workflows-view').is_visible()
     assert page.locator('#qfc-pause').is_disabled()
     assert page.locator('#qfc-start').is_enabled()
     assert page.locator('.qfc-dock').get_attribute('data-phase') == 'paused'
@@ -81,6 +86,7 @@ with sync_playwright() as playwright:
     # SPA navigation must keep separate queues and restore the previous one.
     navigate(page, PROJECT_B)
     page.wait_for_function("document.querySelector('#qfc-count').textContent === '0'")
+    page.locator('[data-action="tab-queue"]').click()
     page.locator('#qfc-compose').fill('Only in Project B')
     page.locator('#qfc-add').click()
     page.wait_for_function("document.querySelector('#qfc-count').textContent === '1'")
@@ -122,6 +128,7 @@ with sync_playwright() as playwright:
     page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('New chat: Start sends')")
     page.wait_for_timeout(100)  # Allow the asynchronous Project queue load to settle.
     page.locator('[data-action="start-workflow"]').click()
+    assert page.locator('#qfc-workflows-view').is_visible()
     page.wait_for_function(
         "document.querySelector('#qfc-status').textContent.includes('Queue complete')",
         timeout=45000)

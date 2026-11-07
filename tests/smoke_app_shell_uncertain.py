@@ -12,9 +12,13 @@ with sync_playwright() as p:
     page.evaluate('QFC.conversationId=()=>window.__mockRoute||null')
     page.evaluate('''() => {
       window.importScripts=()=>{};let listener;
-      chrome.runtime={id:'mock-qfc-extension',onMessage:{addListener(fn){listener=fn;}},sendMessage(msg){return new Promise(res=>listener(msg,{id:'mock-qfc-extension',frameId:0,url:'https://chatgpt.com/'},res));}};
+      chrome.runtime={id:'mock-qfc-extension',onMessage:{addListener(fn){if(!listener) listener=fn; else window.__qfcUiListener=fn;}},sendMessage(msg){return new Promise(res=>listener(msg,{id:'mock-qfc-extension',frameId:0,url:'https://chatgpt.com/'},res));}};
       Object.defineProperty(navigator,'locks',{value:{request:async(_n,_o,cb)=>cb({})}});
     }''')
+    page.evaluate("""() => {
+      chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+      chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
+    }""")
     page.add_script_tag(path=str(PROJECT/'background.js'))
     code=(PROJECT/'content.js').read_text(encoding='utf-8').replace('function isNewChatPage() {',
        'function isNewChatPage() { return true; } function unusedPageCheck() {',1)

@@ -28,7 +28,7 @@ try:
           let workerListener;
           window.chrome.runtime = {
             id: 'mock-qfc-extension',
-            onMessage: { addListener(fn) { workerListener = fn; } },
+            onMessage: { addListener(fn){if(!workerListener) workerListener=fn; else window.__qfcUiListener=fn;} },
             sendMessage(message) {
               return new Promise(resolve => {
                 workerListener(message, { id: 'mock-qfc-extension', frameId: 0, url: 'https://chatgpt.com/' }, resolve);
@@ -37,6 +37,10 @@ try:
           };
           Object.defineProperty(navigator, 'locks', { value: { request: async (_name, _opts, callback) => callback({}) } });
         }''')
+        page.evaluate("""() => {
+          chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+          chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
+        }""")
         page.add_script_tag(path=str(PROJECT / 'background.js'))
         # about:blank has no '/' pathname; use a mock home-page predicate only in this test.
         content = (PROJECT / 'content.js').read_text(encoding='utf-8')
@@ -53,9 +57,12 @@ try:
         page.locator('#qfc-step-1').fill('Second prompt is queued in that conversation')
         page.locator('[data-action="save-workflow-edit"]').click()
         page.locator('[data-action="start-workflow"]').click()
-        page.locator('#qfc-queue-items').get_by_text('Second prompt is queued in that conversation').wait_for()
+        assert page.locator('#qfc-workflows-view').is_visible()
+        assert page.locator('#qfc-queue-view').is_hidden()
         page.wait_for_function('''() => document.querySelector('#qfc-status').textContent.includes('Queue complete')''', timeout=30000)
         assert page.locator('#qfc-count').inner_text() == '0'
+        assert page.locator('#qfc-activity-details').is_hidden()
+        page.locator('[data-action="toggle-activity"]').click()
         activity = page.locator('#qfc-activity-previous').inner_text()
         assert 'Second prompt is queued' in activity and 'Step 2/2' in activity, activity
         assert page.locator('[data-message-author-role="user"]').count() == 2

@@ -18,7 +18,7 @@ try:
           let workerListener;
           window.chrome.runtime = {
             id: 'mock-qfc-extension',
-            onMessage: { addListener(fn) { workerListener = fn; } },
+            onMessage: { addListener(fn){if(!workerListener) workerListener=fn; else window.__qfcUiListener=fn;} },
             sendMessage(message) {
               return new Promise(resolve => {
                 workerListener(message, { id: 'mock-qfc-extension', frameId: 0, url: 'https://chatgpt.com/c/test-chat' }, resolve);
@@ -26,6 +26,10 @@ try:
             }
           };
         }''')
+        page.evaluate("""() => {
+          chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+          chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
+        }""")
         page.add_script_tag(path=str(PROJECT / 'background.js'))
         page.evaluate("QFC.conversationId = () => 'chat:test-chat'; Object.defineProperty(navigator, 'locks', { value: { request: async (_name, _opts, callback) => callback({}) } });")
         page.add_script_tag(path=str(PROJECT / 'content.js'))
@@ -43,6 +47,8 @@ try:
         page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Queue complete')", timeout=25000)
         assert page.locator('#qfc-count').inner_text() == '0'
         assert page.locator('#qfc-activity-current').is_hidden()
+        assert page.locator('#qfc-activity-details').is_hidden()
+        page.locator('[data-action="toggle-activity"]').click()
         assert 'Second queued prompt' in page.locator('#qfc-activity-previous').inner_text()
         assert page.locator('[data-message-author-role="user"]').count() == 3
         print('PASS: queue auto-sends two prompts after saving multi-step workflow')

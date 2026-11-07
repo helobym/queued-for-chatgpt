@@ -21,7 +21,7 @@ with sync_playwright() as playwright:
       let listener;
       chrome.runtime = {
         id: 'mock-qfc-extension',
-        onMessage: {addListener(fn) {listener = fn;}},
+        onMessage: {addListener(fn){if(!listener) listener=fn; else window.__qfcUiListener=fn;}},
         sendMessage(msg) {return new Promise(resolve => listener(msg,
           {id:'mock-qfc-extension',frameId:0,url:location.href}, resolve));}
       };
@@ -31,6 +31,10 @@ with sync_playwright() as playwright:
       window.copied = [];
       Object.defineProperty(navigator, 'clipboard', {configurable:true,
         value:{writeText: async text => {window.copied.push(text);}}});
+    }""")
+    page.evaluate("""() => {
+      chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
+      chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
     }""")
     page.add_script_tag(path=str(ROOT / 'background.js'))
     page.add_script_tag(path=str(ROOT / 'content.js'))

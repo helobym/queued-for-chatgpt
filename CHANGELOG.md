@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.7 (2026-11-07)
+
+- Kept Saved Workflows visible after both Start Workflow and + Load, preserving the active tab, search, step expansion and scroll without altering queue execution.
+- Added an Alt+Shift+Q Chrome Commands shortcut to open/close the floating panel on the active ChatGPT tab, with safe no-receiver behavior and Chrome shortcut reassignment.
+- Made Recent Activity collapsed by default, with accessible expansion and bounded Current/Previous previews that update when viewed.
+- Reduced idle MutationObserver processing and avoided regenerating hidden queue/workflow lists; route changes invalidate the queue render cache.
+- Retained existing Web Locks, local storage records, sequential sending, New Chat/Project migration, conservative send receipts and response-completion conditions.
+- Expanded browser and worker regression tests for shortcut routing, view retention, deferred rendering and activity disclosure.
+- Updated documentation, upgrade checklist and versioned illustrative screenshots for v1.2.7. Real-account and Chromebook memory/performance measurements remain outstanding.
+
 ## 1.2.6 (2026-11-06)
 
 - Added live status and remaining-pending count to the floating Queue dock; excludes the currently active prompt while displaying Running.

@@ -27,8 +27,10 @@
 #qfc-root .qfc-nav button.qfc-active { font-weight: 700; border-bottom-color: #116b4d; }
 #qfc-root .qfc-view { padding: 10px 11px 0; overflow-y: auto; min-height: 0; overscroll-behavior: contain; }
 #qfc-root .qfc-activity { flex-shrink: 0; padding: 7px 12px; border-bottom: 1px solid #e1e8e3; background: #f6f9f7; }
-#qfc-root .qfc-activity-heading { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; color: #50685a; margin-bottom: 3px; }
-#qfc-root .qfc-activity-heading span { font-weight: 400; }
+#qfc-root button.qfc-activity-heading { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 6px; border: 0; background: transparent; border-radius: 5px; padding: 2px; min-height: 26px; font-size: 11px; font-weight: 700; color: #50685a; text-align: left; }
+#qfc-root button.qfc-activity-heading:hover:not(:disabled) { background: #e5eee8; }
+#qfc-root .qfc-activity-heading span { font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#qfc-root #qfc-activity-details { max-height: min(192px, 30vh); overflow-y: auto; overscroll-behavior: contain; }
 #qfc-root .qfc-activity-entry { min-width: 0; padding: 4px 0; }
 #qfc-root .qfc-activity-entry + .qfc-activity-entry:not([hidden]) { border-top: 1px solid #e1e8e3; }
 #qfc-root .qfc-activity-top { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; }
@@ -79,7 +81,8 @@
   #qfc-root #qfc-status, #qfc-root #qfc-workflow-editor { background: #2a3a30; color: #d6e6da; border-color: #3b4b40; }
   #qfc-root .qfc-activity { background: #25372b; border-color: #3b4b40; }
   #qfc-root .qfc-activity-entry + .qfc-activity-entry:not([hidden]) { border-color: #3b4b40; }
-  #qfc-root .qfc-activity-heading, #qfc-root .qfc-activity-state, #qfc-root .qfc-activity-origin { color: #b6c7ba; }
+  #qfc-root button.qfc-activity-heading, #qfc-root .qfc-activity-state, #qfc-root .qfc-activity-origin { color: #b6c7ba; }
+  #qfc-root button.qfc-activity-heading:hover:not(:disabled) { background: #34483b; }
   #qfc-root .qfc-head small, #qfc-root .qfc-meta, #qfc-root .qfc-empty { color: #b6c7ba; }
   #qfc-root .qfc-workflow-details { background: #233229; border-color: #3b4b40; }
   #qfc-root .qfc-workflow-prompt + .qfc-workflow-prompt { border-color: #3b4b40; }

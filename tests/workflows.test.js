@@ -13,7 +13,7 @@ function worker(initial={}) {
   let listener;
   const stored = JSON.parse(JSON.stringify(initial));
   const ctx = vm.createContext({URL, Date, Promise, Math, Set, console, crypto: require('node:crypto').webcrypto,
-    chrome:{runtime:{id:'qfc-test',onMessage:{addListener(fn){listener=fn;}}},storage:{local:{
+    chrome:{commands:{onCommand:{addListener(){}}},runtime:{id:'qfc-test',onMessage:{addListener(fn){listener=fn;}}},storage:{local:{
       async get(keys){return Object.fromEntries(keys.map(key=>[key,stored[key]]));},
       async set(items){Object.assign(stored,JSON.parse(JSON.stringify(items)));}
     }}}});

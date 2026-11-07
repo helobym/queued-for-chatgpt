@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.6 — live dock and expandable, copyable saved workflows. */
+/* Queued for ChatGPT v1.2.7 — lightweight monitoring, native shortcut and compact activity. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -58,6 +58,9 @@
   // View-only state; never persist expanded prompt contents or runner ownership.
   const expandedWorkflowIds = new Set();
   let lastWorkflowRenderKey = null;
+  let lastQueueRenderKey = null;
+  // View-only disclosure: do not persist prompt details or introduce new storage keys.
+  let activityExpanded = false;
 
   function wake() {
     for (const fn of Array.from(signalListeners)) fn();
@@ -202,7 +205,6 @@
           return;
         }
       }
-      setTab('queue');
       notify(state.running
         ? `Added ${workflow.steps.length} step(s) from “${workflow.name}” to the running queue.`
         : `Loaded ${workflow.steps.length} step(s) from “${workflow.name}”. If the queue is stopped, press Start.`);
@@ -317,14 +319,19 @@
           <button type="button" data-action="tab-workflows">☷ Workflows <span id="qfc-workflow-count">0</span></button>
         </nav>
         <section id="qfc-activity" class="qfc-activity" aria-label="Recent queue activity" hidden>
-          <div class="qfc-activity-heading">Recent activity <span>Latest only</span></div>
-          <div id="qfc-activity-current" class="qfc-activity-entry" hidden>
-            <div class="qfc-activity-top"><strong class="qfc-activity-label"></strong><span class="qfc-activity-state"></span></div>
-            <div class="qfc-activity-preview"></div><div class="qfc-activity-origin"></div>
-          </div>
-          <div id="qfc-activity-previous" class="qfc-activity-entry" hidden>
-            <div class="qfc-activity-top"><strong class="qfc-activity-label"></strong><span class="qfc-activity-state"></span></div>
-            <div class="qfc-activity-preview"></div><div class="qfc-activity-origin"></div>
+          <button type="button" class="qfc-activity-heading" data-action="toggle-activity"
+                  aria-expanded="false" aria-controls="qfc-activity-details">
+            <strong>Recent activity</strong><span id="qfc-activity-summary">▾ Expand</span>
+          </button>
+          <div id="qfc-activity-details" hidden>
+            <div id="qfc-activity-current" class="qfc-activity-entry" hidden>
+              <div class="qfc-activity-top"><strong class="qfc-activity-label"></strong><span class="qfc-activity-state"></span></div>
+              <div class="qfc-activity-preview"></div><div class="qfc-activity-origin"></div>
+            </div>
+            <div id="qfc-activity-previous" class="qfc-activity-entry" hidden>
+              <div class="qfc-activity-top"><strong class="qfc-activity-label"></strong><span class="qfc-activity-state"></span></div>
+              <div class="qfc-activity-preview"></div><div class="qfc-activity-origin"></div>
+            </div>
           </div>
         </section>
         <div id="qfc-queue-view" class="qfc-view">
@@ -540,40 +547,54 @@
     if (!root) return;
     const section = root.querySelector('#qfc-activity');
     const head = state.queue[0];
-    // Only identify a current prompt when it has started sending, or this tab
-    // is preparing the first pending item. Do not label idle queued work as running.
     const current = head && (head.status !== 'pending' || state.running) ? head : null;
     const previous = state.lastCompleted;
     const wasHidden = section.hidden;
     section.hidden = !current && !previous;
-    function populate(id, item, label, status) {
-      const element = root.querySelector(id);
-      element.hidden = !item;
-      if (!item) return;
-      element.querySelector('.qfc-activity-label').textContent = label;
-      element.querySelector('.qfc-activity-state').textContent = status;
-      const preview = element.querySelector('.qfc-activity-preview');
-      preview.textContent = item.text || item.preview;
-      preview.title = item.text || item.preview;
-      const origin = element.querySelector('.qfc-activity-origin');
-      const workflow = item.workflow;
-      origin.textContent = workflow
-        ? `${workflow.name} · Step ${workflow.step}/${workflow.total} · ID ${workflow.id.slice(0, 8)}…`
-        : 'Queue prompt';
-      origin.title = workflow ? `Workflow ID: ${workflow.id}` : 'Queued prompt (workflow origin unavailable)';
-    }
+    const button = root.querySelector('[data-action="toggle-activity"]');
+    const details = root.querySelector('#qfc-activity-details');
     const currentStatus = !current ? '' : current.status === 'pending' ? 'Preparing' :
       !state.running ? 'Needs review' :
       current.status === 'sending' ? 'Sending' : 'Awaiting response';
-    populate('#qfc-activity-current', current, 'Current', currentStatus);
-    populate('#qfc-activity-previous', previous, 'Previous',
-      previous?.completion === 'confirmed' ? 'Confirmed done' : 'Completed');
+    const expanded = activityExpanded && !section.hidden;
+    button.setAttribute('aria-expanded', String(expanded));
+    details.hidden = !expanded;
+    root.querySelector('#qfc-activity-summary').textContent = expanded ? '▴ Collapse' :
+      current ? `▾ Current: ${currentStatus}` : '▾ Previous completed';
+
+    // In the collapsed state the current/previous records remain in application
+    // state; populate only when expanded to avoid retaining large hidden strings.
+    if (expanded) {
+      function populate(id, item, label, status) {
+        const element = root.querySelector(id);
+        element.hidden = !item;
+        if (!item) return;
+        element.querySelector('.qfc-activity-label').textContent = label;
+        element.querySelector('.qfc-activity-state').textContent = status;
+        const preview = element.querySelector('.qfc-activity-preview');
+        const display = String(item.text || item.preview || '').slice(0, C.MAX_ACTIVITY_PREVIEW);
+        preview.textContent = display;
+        preview.title = display;
+        const origin = element.querySelector('.qfc-activity-origin');
+        const workflow = item.workflow;
+        origin.textContent = workflow
+          ? `${workflow.name} · Step ${workflow.step}/${workflow.total} · ID ${workflow.id.slice(0, 8)}…`
+          : 'Queue prompt';
+        origin.title = workflow ? `Workflow ID: ${workflow.id}` : 'Queued prompt (workflow origin unavailable)';
+      }
+      populate('#qfc-activity-current', current, 'Current', currentStatus);
+      populate('#qfc-activity-previous', previous, 'Previous',
+        previous?.completion === 'confirmed' ? 'Confirmed done' : 'Completed');
+    }
     if (state.open && wasHidden !== section.hidden) {
       setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
     }
   }
   function renderQueue() {
-    if (!queueList) return;
+    if (!queueList || !state.open || state.tab !== 'queue') return;
+    // The route is essential: separate conversations may share a queue revision.
+    const renderKey = JSON.stringify([state.route, state.queueRev]);
+    if (lastQueueRenderKey === renderKey) return;
     const frag = document.createDocumentFragment();
     if (!state.queue.length) frag.append(makeElement('p', 'qfc-empty', 'Queue empty. Add prompts above.'));
     state.queue.forEach((item, index) => {
@@ -596,9 +617,10 @@
       frag.append(row);
     });
     queueList.replaceChildren(frag);
+    lastQueueRenderKey = renderKey;
   }
   function renderWorkflows() {
-    if (!workflowsList) return;
+    if (!workflowsList || !state.open || state.tab !== 'workflows') return;
     const query = C.normalize(workflowSearch.value).toLocaleLowerCase();
     const renderKey = JSON.stringify([state.workflowsRev, query, [...expandedWorkflowIds].sort()]);
     // Queue status updates must not destroy Copy feedback, text selection or focus.
@@ -707,7 +729,21 @@
     setStatus(message);
     wake();
   }
-  function setTab(tab) { state.tab = tab; renderHeader(); }
+  function setTab(tab) {
+    state.tab = tab;
+    renderHeader();
+    // A hidden list may have missed several queue or workflow revisions.
+    renderQueue();
+    renderWorkflows();
+  }
+  function togglePanel() {
+    if (!root) return;
+    state.open = !state.open;
+    STORAGE.set({ [C.SETTINGS_KEY]: { open: state.open } }).catch(() => {});
+    render();
+    // Clamp the expanded panel (or narrower dock) without resetting drag offsets.
+    setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
+  }
   async function copyPromptText(text, button, resetLabel) {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable.');
@@ -738,12 +774,11 @@
     const queueItem = state.queue.find(item => item.id === id);
     const workflow = state.workflows.find(item => item.id === id);
     switch (action) {
-      case 'toggle':
-        state.open = !state.open;
-        chrome.storage.local.set({ [C.SETTINGS_KEY]: { open: state.open } }).catch(() => {});
-        renderHeader();
-        // Expanded panel is wider/taller than the dock; clamp after opening.
-        setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
+      case 'toggle': togglePanel(); break;
+      case 'toggle-activity':
+        activityExpanded = !activityExpanded;
+        renderActivity();
+        setPanelPosition(panelOffsetX, panelOffsetY);
         break;
       case 'reset-position': resetPanelPosition(); break;
       case 'tab-queue': setTab('queue'); break;
@@ -1294,7 +1329,6 @@
           if (state.route !== route) {
             pause('Conversation changed; workflow was saved to the prior chat queue.'); return;
           }
-          setTab('queue');
           setStatus(`Workflow “${workflow.name}” started — sending in order…`);
         }
         if (!state.queue.length || state.queue[0].status !== 'pending') {
@@ -1315,6 +1349,13 @@
   }
   function observePage() {
     pageObserver = new MutationObserver(records => {
+      // Keep the full observer subscription for ChatGPT's silent SPA route
+      // changes, but avoid expensive assistant selectors when no runner needs
+      // response evidence. This also retains characterData-only navigation.
+      if (!state.running && signalListeners.size === 0) {
+        if (location.pathname !== lastPathname) scheduleRouteCheck();
+        return;
+      }
       let touched = false;
       for (const change of records) {
         const target = change.target.nodeType === Node.ELEMENT_NODE ? change.target : change.target.parentElement;
@@ -1374,6 +1415,15 @@
     render();
     setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
     observePage();
+    // The service worker sends only an extension-originated UI command.
+    // Register after settings hydration so an early shortcut cannot be undone
+    // by the initial asynchronous open-state restoration.
+    chrome.runtime.onMessage.addListener((message, sender) => {
+      if (sender?.id !== chrome.runtime.id ||
+          message?.app !== 'qfc-ui-v1' || message.action !== 'toggle-panel') return false;
+      togglePanel();
+      return false;
+    });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
       if (changes[C.WORKFLOWS_KEY]) applyWorkflows(changes[C.WORKFLOWS_KEY].newValue);
