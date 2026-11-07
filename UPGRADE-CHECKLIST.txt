@@ -1,36 +1,32 @@
-QUEUED FOR CHATGPT — v1.2.6 to v1.2.7
+QUEUED FOR CHATGPT — v1.2.7 to v1.2.8
 
-[ ] Export important Saved Queue Workflows as a JSON backup before upgrading.
-[ ] Let running prompts finish or pause the queue; manually review uncertain in-flight items.
-[ ] Keep the same installed unpacked-extension directory and extension ID.
-[ ] Download queued-for-chatgpt-v1.2.7.zip from the GitHub v1.2.7 Release (Assets).
-[ ] Extract, then replace matching files in the SAME installed extension directory.
-[ ] At chrome://extensions, click Reload and confirm version 1.2.7.
-[ ] Refresh all ChatGPT tabs/windows so outdated content scripts are replaced.
-[ ] On Workflows, click + Load when idle; verify Workflows stays visible and pending count increases without sending.
-[ ] Start a saved workflow; verify Workflows stays visible while the dock shows Running and the pending count.
-[ ] Expand a saved workflow; verify its expanded prompts, Copy feedback, search and scroll remain while running.
-[ ] Choose Queue manually; verify it displays the latest pending/in-flight records without stale items.
-[ ] On ChatGPT, press Alt+Shift+Q to open/close the panel and preserve the selected tab/drag position.
-[ ] If that shortcut is unavailable, check or reassign it at chrome://extensions/shortcuts.
-[ ] Verify the shortcut doesn't start/pause/retry a prompt, including while the queue is running.
-[ ] Confirm Recent Activity is collapsed by default; Expand shows Current and Previous and their workflow origin.
-[ ] Switch Queue/Workflows and close/reopen the panel; verify activity expansion state is preserved.
-[ ] Verify the panel fits on narrow and short windows after expanding/collapsing activity.
-[ ] Confirm the dock remains accurate while the panel is closed and when the queue completes.
-[ ] On New Chat and a Project landing page, confirm + Load remains passive and Start Workflow migrates safely after first send.
-[ ] Confirm queues remain isolated between different Project landing pages and conversations.
-[ ] Confirm a workflow loaded during an active run executes only after earlier pending prompts.
-[ ] Verify Copy works for pending, sending, awaiting and saved workflow prompts.
-[ ] Repeat two identical harmless prompts; verify two distinct ChatGPT user turns and no premature next send.
-[ ] If sending or completion is uncertain, verify the extension pauses rather than retrying automatically.
-[ ] Inspect Chrome Task Manager with the extension enabled and disabled on comparable chats for CPU/memory; record actual measurements.
+[ ] Back up important Saved Queue Workflows before updating.
+[ ] Let any running prompt finish or use Pause; inspect uncertain queued items.
+[ ] Keep the SAME existing unpacked-extension directory and extension ID.
+[ ] Download queued-for-chatgpt-v1.2.8.zip from GitHub Release v1.2.8 (Assets).
+[ ] Extract and replace all files in the existing installed folder.
+[ ] In chrome://extensions click Reload and confirm version 1.2.8.
+[ ] Refresh all ChatGPT tabs so the new content script and service worker are loaded.
+[ ] Confirm the new Chrome notifications permission is allowed; check OS Focus/Do Not Disturb settings.
+[ ] Start a harmless 2-step saved workflow and verify a single "Workflow completed successfully" desktop notification.
+[ ] Confirm the notification reports "All 2 prompts finished" and the workflow name.
+[ ] Click the notification and confirm the correct existing ChatGPT tab is activated.
+[ ] Run a queue with manual and workflow prompts and confirm one "Queue completed successfully" alert.
+[ ] Load additional workflow steps during an active run; confirm there is only one final notification.
+[ ] Trigger a safe simulated send-failure test and confirm an attention notification, never success.
+[ ] Pause a running queue yourself and confirm there is no notification.
+[ ] Manually stop a ChatGPT response and confirm there is no automatic success notification.
+[ ] Check two ChatGPT tabs: only the sending tab reports a terminal notification.
+[ ] Start a New Chat workflow and confirm its first response counts exactly once.
+[ ] Confirm the floating panel, Alt+Shift+Q, activity disclosure and existing workflow controls work.
+[ ] If desired, test Chrome Memory Saver tab discard and verify a best-effort interruption alert.
+[ ] Repeat sending receipt and response-completion checks; never auto-retry uncertain prompts.
+[ ] Record any real-device resource metrics instead of assuming CPU/RAM savings.
 
 IMPORTANT:
-- + Load never starts an idle queue and never interrupts an active sender.
-- Start Workflow checks for pending items, confirmation, and sender-lock ownership before appending.
-- A workflow is appended atomically; 100 queued prompts is still the maximum.
-- Recent Activity is view-only; shortcut and disclosure do not mutate queue records.
-- A missing keyboard shortcut can be resolved in Chrome's extension shortcut settings.
-- This release does not change the local storage schema or require new broad permissions.
-- Live ChatGPT compatibility and Chromebook resource usage still require device testing.
+- Desktop notifications require Chrome/OS permission; they may be suppressed by notification settings.
+- No message content or assistant replies are written to notification records; workflow names can appear on screen.
+- A browser crash, full shutdown, extension reload or closed/discarded tab may prevent delivery.
+- Memory Saver discard means interrupted or uncertain execution, never success.
+- The original sender lock, 100-prompt queue cap and safety checks remain unchanged.
+- Existing queues and workflows require no data migration.

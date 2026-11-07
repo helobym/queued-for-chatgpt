@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.7 — lightweight monitoring, native shortcut and compact activity. */
+/* Queued for ChatGPT v1.2.8 — verified completion and interruption notifications. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -61,6 +61,38 @@
   let lastQueueRenderKey = null;
   // View-only disclosure: do not persist prompt details or introduce new storage keys.
   let activityExpanded = false;
+  // Page-local execution session. Never persist full prompts or responses.
+  let activeRun = null;
+  function runEvent(run, action, reason = 'unexpected') {
+    // Delivery is best-effort and must not change sender/queue behavior.
+    return chrome.runtime.sendMessage({
+      app: 'qfc-v1.1', command: 'runLifecycle', action,
+      runId: run.id, verifiedCount: run.verifiedCount,
+      workflowName: run.mixed ? '' : run.workflowName,
+      reason: action === 'interrupted' ? reason : undefined
+    }).catch(() => {});
+  }
+  async function beginRun() {
+    const origin = state.queue[0]?.workflow;
+    const workflowId = origin?.id || null;
+    const mixed = state.queue.some(item => (item.workflow?.id || null) !== workflowId);
+    const run = {
+      id: makeOperationId(), verifiedCount: 0,
+      workflowId, workflowName: mixed ? '' : (origin?.name || ''), mixed
+    };
+    activeRun = run;
+    // Wait for registration so even the fastest run has a registered owner.
+    // Failure to register does not block the sender.
+    await runEvent(run, 'start');
+  }
+  function recordVerified(item) {
+    if (!activeRun) return;
+    activeRun.verifiedCount++;
+    if ((item.workflow?.id || null) !== activeRun.workflowId) {
+      activeRun.mixed = true;
+      activeRun.workflowName = '';
+    }
+  }
 
   function wake() {
     for (const fn of Array.from(signalListeners)) fn();
@@ -163,7 +195,7 @@
       applyQueue(route, record);
       return record;
     } catch (error) {
-      if (['sending', 'awaiting', 'complete'].includes(type)) pause('Storage or queue state changed; review the chat before resuming.');
+      if (['sending', 'awaiting', 'complete'].includes(type)) pause('Storage or queue state changed; review the chat before resuming.', 'interrupted', 'storage');
       throw error;
     }
   }
@@ -270,7 +302,7 @@
       !navigateToExistingChat && (expectedHandoff || Date.now() - tempSubmittedAt < 90000)
       ? previous : null;
     navigateToExistingChat = false; tempSubmittedAt = 0;
-    if (state.running && !expectedHandoff) pause('Conversation changed — queue paused.');
+    if (state.running && !expectedHandoff) pause('Conversation changed — queue paused.', 'interrupted', 'route');
     if (expectedHandoff) newChatHandoff.destination = stable;
     state.route = route;
     // Set loading BEFORE rendering the emptied route to avoid a false Idle flash.
@@ -722,12 +754,18 @@
     try { await queueOp('add', { text }); render(); return true; }
     catch (error) { notify(error.message || 'Could not add prompt.'); return false; }
   }
-  function pause(message = 'Paused') {
+  function pause(message = 'Paused', outcome = 'interrupted', reason = 'unexpected') {
+    const finishedRun = activeRun;
+    activeRun = null; // Retire synchronously: no second terminal notification.
     state.running = false;
     state.senderLockRoute = null;
     newChatHandoff = null;
     setStatus(message);
     wake();
+    // Pagehide leaves the background record for tabs.onUpdated(discarded) or
+    // tabs.onRemoved; an unload is not evidence of success or failure.
+    if (finishedRun && outcome !== 'abandoned')
+      void runEvent(finishedRun, outcome, reason);
   }
   function setTab(tab) {
     state.tab = tab;
@@ -799,10 +837,10 @@
       }
       case 'cancel-edit': cancelQueueEdit(); break;
       case 'start': startQueue(); break;
-      case 'pause': pause('Paused by you.'); break;
+      case 'pause': pause('Paused by you.', 'manual'); break;
       case 'clear':
         if (!state.queue.length || !confirm('Clear all pending queued prompts for this conversation?')) break;
-        if (state.running) pause('Queue cleared.');
+        if (state.running) pause('Queue cleared.', 'manual');
         await editWithLock(() => queueOp('clear')); render(); break;
       case 'up': case 'down':
         if (!queueItem || state.running) { notify('Pause before reordering.'); break; }
@@ -1035,7 +1073,7 @@
     while (healthyRoute(route) && Date.now() < deadline) {
       const editor = findEditor();
       if (editor && !isGenerating()) {
-        if (C.normalize(editorText(editor))) { pause('ChatGPT has an unsent draft. Queue paused to protect it.'); return false; }
+        if (C.normalize(editorText(editor))) { pause('ChatGPT has an unsent draft. Queue paused to protect it.', 'interrupted', 'composer'); return false; }
         // Guard against a momentary stop-button disappearance during regeneration.
         await signalOrTimeout(1400);
         if (healthyRoute(route) && !isGenerating()) return true;
@@ -1044,14 +1082,14 @@
         await signalOrTimeout(Math.min(5000, deadline - Date.now()));
       }
     }
-    if (state.running && Date.now() >= deadline) pause('ChatGPT did not become ready. Queue paused.');
+    if (state.running && Date.now() >= deadline) pause('ChatGPT did not become ready. Queue paused.', 'interrupted', 'composer');
     return false;
   }
   async function sendMessage(text, route) {
     const editor = findEditor();
     if (!editor || !healthyRoute(route) || isGenerating()) return false;
-    if (C.normalize(editorText(editor))) { pause('Unsent ChatGPT draft detected. Queue paused.'); return false; }
-    if (!writeEditor(editor, text)) { pause('Composer changed; cannot safely insert prompt.'); return false; }
+    if (C.normalize(editorText(editor))) { pause('Unsent ChatGPT draft detected. Queue paused.', 'interrupted', 'composer'); return false; }
+    if (!writeEditor(editor, text)) { pause('Composer changed; cannot safely insert prompt.', 'interrupted', 'composer'); return false; }
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline && healthyRoute(route)) {
       const button = findSendButton(editor);
@@ -1067,7 +1105,7 @@
       }
       await signalOrTimeout(250);
     }
-    pause('Could not verify the Send button. Check draft before retrying.');
+    pause('Could not verify the Send button. Check draft before retrying.', 'interrupted', 'send');
     return false;
   }
   // DOM nodes can be replaced when ChatGPT re-renders a conversation. A new
@@ -1195,7 +1233,7 @@
         }
         const item = state.queue[0];
         if (item.status !== 'pending') {
-          pause('Review uncertain message. Use ✓ Done or ↺ Retry before resuming.'); return;
+          pause('Review uncertain message. Use ✓ Done or ↺ Retry before resuming.', 'interrupted', 'send'); return;
         }
         const idle = await waitForComposerIdle(route, Date.now() + 10 * 60 * 1000);
         if (!idle || !healthyRoute(route)) return;
@@ -1205,22 +1243,22 @@
         const clicked = await sendMessage(item.text, route);
         if (!clicked) {
           // Never restore to pending automatically: editor text may have been inserted.
-          if (state.running) pause('Send not confirmed. Check ChatGPT and resolve item manually.');
+          if (state.running) pause('Send not confirmed. Check ChatGPT and resolve item manually.', 'interrupted', 'send');
           return;
         }
         setStatus('Checking submitted prompt…');
         const received = await waitForReceipt(item.text, userBaseline, route);
-        if (!received) { pause('Could not confirm sent message. Check ChatGPT before continuing.'); return; }
+        if (!received) { pause('Could not confirm sent message. Check ChatGPT before continuing.', 'interrupted', 'send'); return; }
         await queueOp('awaiting', { id: item.id }, route); render();
         setStatus('Waiting for response to finish…');
         const finished = await waitForResponse(oldAssistant, route);
-        if (!finished) { pause('Response completion uncertain. Verify ChatGPT, then use ✓ Done.'); return; }
+        if (!finished) { pause('Response completion uncertain. Verify ChatGPT, then use ✓ Done.', 'interrupted', 'response'); return; }
         if (!healthyRoute(route)) return;
-        await queueOp('complete', { id: item.id }, route); render();
+        await queueOp('complete', { id: item.id }, route); recordVerified(item); render();
         setStatus('Response complete; continuing queue…');
       }
-      if (state.running) pause('Queue complete.');
-    } catch (error) { pause('Queue stopped due to an unexpected page or storage error.'); console.warn('[Queued for ChatGPT]', error); }
+      if (state.running) pause('Queue complete.', 'success');
+    } catch (error) { pause('Queue stopped due to an unexpected page or storage error.', 'interrupted', 'storage'); console.warn('[Queued for ChatGPT]', error); }
   }
   async function runFirstPromptInNewChat(temporaryRoute) {
     const first = state.queue[0];
@@ -1237,7 +1275,7 @@
     const handoff = newChatHandoff;
     const clicked = await sendMessage(first.text, temporaryRoute);
     if (!clicked) {
-      if (state.running) pause('First send uncertain. Check the composer before retrying.');
+      if (state.running) pause('First send uncertain. Check the composer before retrying.', 'interrupted', 'send');
       return;
     }
     setStatus('Creating ChatGPT conversation…');
@@ -1250,31 +1288,32 @@
     if (!state.running || newChatHandoff !== handoff) return;
     const stableRoute = handoff.destination;
     if (!stableRoute || state.route !== stableRoute) {
-      pause('Chat ID was not confirmed. Check the first message and retry only after review.'); return;
+      pause('Chat ID was not confirmed. Check the first message and retry only after review.', 'interrupted', 'route'); return;
     }
     // A second tab must not send to the newly created conversation while we verify the first prompt.
     await navigator.locks.request('qfc-queue-' + stableRoute, { ifAvailable: true }, async lock => {
-      if (!lock) { pause('This new conversation is being controlled by another tab.'); return; }
+      if (!lock) { pause('This new conversation is being controlled by another tab.', 'interrupted', 'route'); return; }
       state.senderLockRoute = stableRoute;
       renderHeader();
       while (state.running && state.routeLoading && Date.now() < deadline) await signalOrTimeout(250);
       if (!healthyRoute(stableRoute) || !state.storageHealthy || state.routeLoading ||
           state.queue[0]?.id !== handoff.id || state.queue[0]?.status !== 'sending') {
-        pause('Could not verify queue migration. Review first prompt before resuming.'); return;
+        pause('Could not verify queue migration. Review first prompt before resuming.', 'interrupted', 'storage'); return;
       }
       setStatus('Checking the first submitted prompt or reply…');
       const evidence = await waitForFirstTurnEvidence(handoff.text, previousUsers, previousAssistant, stableRoute);
       if (!evidence) {
-        pause('First send could not be confirmed. Check ChatGPT before resuming.'); return;
+        pause('First send could not be confirmed. Check ChatGPT before resuming.', 'interrupted', 'send'); return;
       }
       await queueOp('awaiting', { id: handoff.id }, stableRoute);
       setStatus(evidence.receipt === 'assistant'
         ? 'First reply detected; verifying completion…' : 'Waiting for the first response…');
       if (!await waitForResponse(previousAssistant, stableRoute, evidence.sawStop)) {
-        pause('First response completion uncertain. Use ✓ Done after reviewing.'); return;
+        pause('First response completion uncertain. Use ✓ Done after reviewing.', 'interrupted', 'response'); return;
       }
       if (!healthyRoute(stableRoute)) return;
       await queueOp('complete', { id: handoff.id }, stableRoute);
+      recordVerified(first);
       newChatHandoff = null;
       setStatus('First response complete; continuing queue…');
       await runQueue(stableRoute);
@@ -1327,13 +1366,18 @@
           const record = await rpc('appendWorkflow', { route, workflowId }, makeOperationId());
           applyQueue(route, record);
           if (state.route !== route) {
-            pause('Conversation changed; workflow was saved to the prior chat queue.'); return;
+            pause('Conversation changed; workflow was saved to the prior chat queue.', 'interrupted', 'route'); return;
           }
           setStatus(`Workflow “${workflow.name}” started — sending in order…`);
         }
         if (!state.queue.length || state.queue[0].status !== 'pending') {
           pause('Queue has changed. Review the first prompt before resuming.'); return;
         }
+        // Only the lock owner with a ready queue may register a run.
+        // Pause can occur while the queue was being loaded asynchronously.
+        if (!healthyRoute(route)) return;
+        await beginRun();
+        if (!healthyRoute(route)) return;
         if (route.startsWith('new:')) await runFirstPromptInNewChat(route);
         else await runQueue(route);
       } catch (error) {
@@ -1379,7 +1423,7 @@
       // Only a real user click; don't confuse the disappearance of Stop after
       // manual cancellation with successful assistant completion.
       if (state.running && event.isTrusted && event.target.closest?.(STOP_SELECTORS)) {
-        pause('Response manually stopped. Review the current queued prompt.');
+        pause('Response manually stopped. Review the current queued prompt.', 'manual');
       }
       const link = event.target.closest?.('a[href]');
       if (link) {
@@ -1400,7 +1444,7 @@
       const editor = findEditor();
       if (editor && (event.target === editor || editor.contains(event.target)) && C.normalize(editorText(editor))) tempSubmittedAt = Date.now();
     }, true);
-    window.addEventListener('pagehide', () => pause('Tab closed or navigating away.'));
+    window.addEventListener('pagehide', () => pause('Tab closed or navigating away.', 'abandoned'));
   }
   async function initialize() {
     initPanel();

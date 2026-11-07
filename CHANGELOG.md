@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.8 (2026-11-07)
+
+- Added native Chrome desktop notifications for a successfully verified full run and for unexpected automatic pauses requiring manual review.
+- Counted only completed queue mutations, including the first response of New Chat/Project handoffs, and labeled mixed-source queues accurately.
+- Kept user Pause, manual ChatGPT Stop, rejected lock attempts and Load-only actions silent.
+- Registered tiny per-tab run records in session-scoped storage to prevent duplicate alerts across service-worker restarts and detect Chrome Memory Saver tab discards.
+- Added notification click routing to an existing ChatGPT tab; never opens a new tab without an explicit user action.
+- Added focused worker and simulated Chromium tests, updated notification permission disclosures and packaged v1.2.8 release assets.
+- No changes to queue storage schema, Web Locks, receipt/response verification, polling frequency, background servers or telemetry.
+- Desktop notification delivery depends on Chrome/OS settings; live account and Chromebook performance remain unmeasured.
+
 ## 1.2.7 (2026-11-07)
 
 - Kept Saved Workflows visible after both Start Workflow and + Load, preserving the active tab, search, step expansion and scroll without altering queue execution.

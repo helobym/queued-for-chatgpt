@@ -2,10 +2,11 @@
   "manifest_version": 3,
   "name": "Queued for ChatGPT",
   "short_name": "Queued for ChatGPT",
-  "version": "1.2.7",
-  "description": "Lightweight ChatGPT queues, saved workflows, shortcut panel toggle, collapsible recent activity, live status and safe sequential sending.",
+  "version": "1.2.8",
+  "description": "Lightweight ChatGPT queues and saved workflows with verified completion and automatic-stop desktop notifications.",
   "permissions": [
-    "storage"
+    "storage",
+    "notifications"
   ],
   "content_scripts": [
     {

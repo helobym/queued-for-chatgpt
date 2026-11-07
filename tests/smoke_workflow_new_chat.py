@@ -31,7 +31,7 @@ try:
             onMessage: { addListener(fn){if(!workerListener) workerListener=fn; else window.__qfcUiListener=fn;} },
             sendMessage(message) {
               return new Promise(resolve => {
-                workerListener(message, { id: 'mock-qfc-extension', frameId: 0, url: 'https://chatgpt.com/' }, resolve);
+                workerListener(message, { id: 'mock-qfc-extension', frameId: 0, url: 'https://chatgpt.com/', tab: {id:41} }, resolve);
               });
             }
           };
@@ -40,6 +40,19 @@ try:
         page.evaluate("""() => {
           chrome.commands = {onCommand:{addListener(fn){window.__qfcCommandListener=fn;}}};
           chrome.tabs = {query:async()=>[],sendMessage:async()=>{}};
+          const session = {};
+          window.__newChatNotices = [];
+          chrome.storage.session = {
+            async get(key){return {[key]:session[key]};},
+            async set(data){Object.assign(session,data);},
+            async remove(key){delete session[key];}
+          };
+          chrome.notifications = {
+            async create(id, options){
+              window.__newChatNotices.push({id,options});return id;
+            },
+            onClicked:{addListener(){}}
+          };
         }""")
         page.add_script_tag(path=str(PROJECT / 'background.js'))
         # about:blank has no '/' pathname; use a mock home-page predicate only in this test.
@@ -61,6 +74,10 @@ try:
         assert page.locator('#qfc-queue-view').is_hidden()
         page.wait_for_function('''() => document.querySelector('#qfc-status').textContent.includes('Queue complete')''', timeout=30000)
         assert page.locator('#qfc-count').inner_text() == '0'
+        page.wait_for_function('window.__newChatNotices.length === 1')
+        notification = page.evaluate('window.__newChatNotices[0].options')
+        assert notification['title'] == 'Workflow completed successfully', notification
+        assert 'All 2 prompts finished · New chat workflow' in notification['message'], notification
         assert page.locator('#qfc-activity-details').is_hidden()
         page.locator('[data-action="toggle-activity"]').click()
         activity = page.locator('#qfc-activity-previous').inner_text()

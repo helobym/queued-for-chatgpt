@@ -1,10 +1,98 @@
-/* Queued for ChatGPT v1.2.7 — serialized coordinator and native panel shortcut. */
+/* Queued for ChatGPT v1.2.8 — serialized coordinator, shortcuts and verified run alerts. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;
 const M = globalThis.QFCCoordinator;
 const V1_FAVORITES = 'qfc_v1_favorites';
 const V1_QUEUE_PREFIX = 'qfc_v1_queue_';
+// Only small metadata is retained for active runs; never prompts or replies.
+const RUN_PREFIX = 'qfc_v1_notify_run_';
+const RUN_ID = /^[a-zA-Z0-9_-]{8,120}$/;
+const RUN_REASONS = Object.freeze({
+  response: 'Response completion could not be confirmed',
+  send: 'Prompt submission could not be confirmed',
+  composer: 'ChatGPT composer needs review',
+  storage: 'Queue or storage state changed',
+  route: 'Conversation changed during execution',
+  unexpected: 'The run stopped unexpectedly',
+  discarded: 'Chrome discarded the running ChatGPT tab'
+});
+// The fallback keeps older simulated browser environments compatible; Chrome's
+// session storage survives a normal Manifest V3 service-worker restart.
+const volatileRuns = new Map();
+function runKey(tabId) { return RUN_PREFIX + tabId; }
+async function getRun(tabId) {
+  try {
+    if (chrome.storage.session?.get) {
+      const stored = await chrome.storage.session.get(runKey(tabId));
+      if (stored[runKey(tabId)]) return stored[runKey(tabId)];
+    }
+  } catch (_) { /* Notifications cannot affect execution. */ }
+  return volatileRuns.get(tabId) || null;
+}
+async function storeRun(tabId, record) {
+  if (record) volatileRuns.set(tabId, record);
+  else volatileRuns.delete(tabId);
+  try {
+    if (!chrome.storage.session) return;
+    if (record) await chrome.storage.session.set({ [runKey(tabId)]: record });
+    else await chrome.storage.session.remove(runKey(tabId));
+  } catch (_) { /* Fallback stays valid until this worker sleeps. */ }
+}
+async function showRunNotification(run, outcome, count, name, reason) {
+  if (!chrome.notifications?.create) return;
+  const workflowName = C.validWorkflowName(name) ? name.trim() : '';
+  const suffix = workflowName ? ' · ' + workflowName : '';
+  const title = outcome === 'success'
+    ? (workflowName ? 'Workflow completed successfully' : 'Queue completed successfully')
+    : (workflowName ? 'Workflow stopped — action required' : 'Queue stopped — action required');
+  const detail = outcome === 'success'
+    ? 'All ' + count + (count === 1 ? ' prompt finished' : ' prompts finished')
+    : RUN_REASONS[reason] || RUN_REASONS.unexpected;
+  const progress = outcome !== 'success' && reason !== 'discarded' && count > 0
+    ? ' · ' + count + ' verified' : '';
+  const iconUrl = chrome.runtime.getURL
+    ? chrome.runtime.getURL('icons/icon128.png') : 'icons/icon128.png';
+  try {
+    await chrome.notifications.create('qfc-run-' + run.tabId + '-' + run.runId, {
+      type: 'basic', iconUrl, title,
+      message: (detail + progress + suffix).slice(0, 250)
+    });
+  } catch (_) { /* User/OS may block notifications. */ }
+}
+async function runLifecycle(message, sender) {
+  const tabId = sender.tab?.id;
+  if (!Number.isSafeInteger(tabId) || tabId < 0 || !RUN_ID.test(message.runId))
+    return { accepted: false };
+  const action = message.action;
+  if (!['start', 'success', 'interrupted', 'manual'].includes(action))
+    return { accepted: false };
+  if (action === 'start') {
+    const name = C.validWorkflowName(message.workflowName)
+      ? message.workflowName.trim() : '';
+    const existing = await getRun(tabId);
+    if (existing?.runId === message.runId) return { accepted: true };
+    await storeRun(tabId, { tabId, runId: message.runId, workflowName: name, startedAt: Date.now() });
+    return { accepted: true };
+  }
+  const run = await getRun(tabId);
+  if (!run || run.runId !== message.runId) return { accepted: false };
+  // Clear first: duplicates, tab discard and service-worker restarts cannot
+  // display multiple terminal notifications for the same run.
+  await storeRun(tabId, null);
+  const count = Number.isSafeInteger(message.verifiedCount) &&
+    message.verifiedCount >= 0 && message.verifiedCount <= 1000000
+    ? message.verifiedCount : 0;
+  const name = typeof message.workflowName === 'string'
+    ? (C.validWorkflowName(message.workflowName) ? message.workflowName.trim() : '')
+    : run.workflowName;
+  if (action === 'success' && count > 0)
+    await showRunNotification(run, 'success', count, name, '');
+  else if (action === 'interrupted')
+    await showRunNotification(run, 'interrupted', count, name,
+      Object.hasOwn(RUN_REASONS, message.reason) ? message.reason : 'unexpected');
+  return { accepted: true };
+}
 // This chain is process-local only: no durable state relies on the worker staying alive.
 let writes = Promise.resolve();
 function serialized(fn) {
@@ -92,6 +180,7 @@ function allowedSender(sender) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!allowedSender(sender) || !message || message.app !== 'qfc-v1.1') return false;
   serialized(async () => {
+    if (message.command === 'runLifecycle') return runLifecycle(message, sender);
     if (message.command === 'getQueue') return load('queue', message.route);
     if (message.command === 'getFavorites') return load('favorites');
     if (message.command === 'getWorkflows') return load('workflows');
@@ -119,4 +208,43 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
     // receiver (other websites, closed or unloaded tabs) is a harmless no-op.
     await chrome.tabs.sendMessage(target.id, { app: 'qfc-ui-v1', action: 'toggle-panel' });
   } catch (_) { /* No receiver or tab disappeared. Do not affect queue execution. */ }
+});
+
+// Tab lifecycle events are passive and event-driven. A loading navigation
+// is not sufficient evidence of a discard; give the discarded event priority
+// and clean abandoned records only when navigation completes.
+chrome.tabs?.onUpdated?.addListener((tabId, changeInfo) => {
+  if (changeInfo.discarded === true) {
+    void serialized(async () => {
+      const run = await getRun(tabId);
+      if (!run) return;
+      await storeRun(tabId, null);
+      await showRunNotification(run, 'interrupted', 0, run.workflowName, 'discarded');
+    }).catch(() => {});
+  } else if (changeInfo.status === 'complete' ||
+             (typeof changeInfo.url === 'string' &&
+              !/^https:\/\/chatgpt\.com(?:\/|$)/.test(changeInfo.url))) {
+    // A full navigation/reload ended the old content-script run. A New Chat
+    // SPA route handoff does not trigger this cleanup.
+    void serialized(() => storeRun(tabId, null)).catch(() => {});
+  }
+});
+chrome.tabs?.onRemoved?.addListener(tabId => {
+  // Closing a tab is user-controlled; do not generate a false success/error.
+  void serialized(() => storeRun(tabId, null)).catch(() => {});
+});
+chrome.notifications?.onClicked?.addListener(notificationId => {
+  const match = /^qfc-run-(\d+)-[a-zA-Z0-9_-]{8,120}$/.exec(notificationId);
+  if (!match) return;
+  const tabId = Number(match[1]);
+  void (async () => {
+    try {
+      // Never focus an unrelated tab if Chrome has reused a tab identifier.
+      const existing = chrome.tabs.get ? await chrome.tabs.get(tabId) : null;
+      if (existing?.url && !/^https:\/\/chatgpt\.com(?:\/|$)/.test(existing.url)) return;
+      const tab = await chrome.tabs.update(tabId, { active: true });
+      const windowId = existing?.windowId ?? tab?.windowId;
+      if (Number.isSafeInteger(windowId)) await chrome.windows?.update(windowId, { focused: true });
+    } catch (_) { /* The originating tab no longer exists. Never auto-open a tab. */ }
+  })();
 });
