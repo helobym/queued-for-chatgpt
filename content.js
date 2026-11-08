@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.12 — configurable safe sleep and settings backups. */
+/* Queued for ChatGPT v1.2.13 — neutral aligned window controls. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -494,10 +494,10 @@
             <small>Drag here to move · local · lightweight</small>
           </div>
           <div class="qfc-head-actions">
-            <button type="button" class="qfc-small qfc-power" data-action="turn-off" title="Close Queued and turn it off in this tab" aria-label="Close Queued and turn it off in this tab">✕</button>
             <button type="button" class="qfc-small" data-action="open-settings" title="Settings" aria-label="Settings" aria-pressed="false">⚙</button>
             <button type="button" class="qfc-small" data-action="reset-position" title="Reset panel position" aria-label="Reset panel position">⌖</button>
             <button type="button" class="qfc-small qfc-minimize" data-action="toggle" title="Minimize to the Queue dock" aria-label="Minimize Queued to dock">−</button>
+            <button type="button" class="qfc-small qfc-power" data-action="turn-off" title="Close Queued and turn it off in this tab" aria-label="Close Queued and turn it off in this tab">✕</button>
           </div>
         </header>
         <nav class="qfc-nav" aria-label="Extension sections">

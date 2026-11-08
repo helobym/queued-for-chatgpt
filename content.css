@@ -21,8 +21,8 @@
 #qfc-root .qfc-drag-icon { color: #729484; font-size: 18px; vertical-align: -1px; }
 #qfc-root .qfc-head-actions { display: flex; gap: 4px; flex-shrink: 0; }
 #qfc-root .qfc-head-actions button { min-width: 29px; }
-#qfc-root .qfc-head-actions .qfc-power { font-size: 18px; line-height: 1; font-weight: 700; color: #a64040; background: #fff5f5; border-color: #eacaca; }
-#qfc-root .qfc-head-actions .qfc-minimize { font-size: 21px; line-height: 1; font-weight: 700; }
+#qfc-root .qfc-head-actions .qfc-minimize,
+#qfc-root .qfc-head-actions .qfc-power { font-size: 21px; line-height: 1; font-weight: 700; }
 #qfc-root .qfc-head small { display: block; color: #66776d; margin-top: 1px; }
 #qfc-root .qfc-nav { display: flex; border-bottom: 1px solid #e1e8e3; gap: 5px; padding: 5px 9px 0; }
 #qfc-root .qfc-nav button { flex: 1; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 2px; }
@@ -115,7 +115,6 @@
   #qfc-root .qfc-panel { background: #202a25; color: #edf3ee; border-color: #4b6051; }
   #qfc-root button { background: #2e3c33; color: #e7eee9; border-color: #506252; }
   #qfc-root button:hover:not(:disabled) { background: #405345; }
-  #qfc-root .qfc-head-actions .qfc-power { color: #ffc1c1; background: #3e2929; border-color: #7c4545; }
   #qfc-root .qfc-settings-divider { border-color: #3b4b40; }
   #qfc-root .qfc-primary, #qfc-root .qfc-dock { background: #157650; color: #fff; border-color: #157650; }
   #qfc-root .qfc-primary:hover:not(:disabled), #qfc-root .qfc-dock:hover { background: #10805a; }

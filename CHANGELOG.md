@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.13 (2026-11-08)
+
+- Moved the ✕ close/turn-off control immediately after the − minimize control at the far right of the floating window header.
+- Unified both buttons' neutral background, border, text color, font size, and bold weight in light and dark themes.
+- Kept minimize and safe per-tab shutdown behavior unchanged; added a targeted Chromium regression assertion for order and computed styles.
+
+
 ## 1.2.12 (2026-11-08)
 
 - Added an auto-turn-off duration selector under Settings: Never, 1, 5, 10, 15, 30 or 60 minutes; existing users keep the five-minute default.

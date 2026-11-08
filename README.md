@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.12 — Configurable Sleep and Complete Settings Backups
+# Queued for ChatGPT v1.2.13 — Consistent Window Controls
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.12](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.12)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.13](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.13:** The ✕ close/turn-off button now appears immediately **to the right of − minimize** in the floating header. Both controls use matching neutral backgrounds, text colors, font size, and bold weight (including dark mode); behavior remains unchanged.
 
 **New in v1.2.12:** Set **Automatic turn-off** in ⚙ Settings to Never, 1, 5, 10, 15, 30 or 60 minutes (default 5). The header **−** minimizes to the live Queue dock, while **✕** closes Queued and turns it off in that tab. **Export workflows + settings** now includes your duration and all desktop notification preferences in a version 4 JSON backup; importing confirms before replacing settings. Older workflow-only backups remain compatible.
 
@@ -32,13 +34,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.12 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.12), expand **Assets**, and download **`queued-for-chatgpt-v1.2.12.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.13 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13), expand **Assets**, and download **`queued-for-chatgpt-v1.2.13.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.12**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.13**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Click the **Queued for ChatGPT** toolbar icon or press **Alt+Shift+Q**. The floating Queued panel opens in that tab only. Pin the extension in Chrome's toolbar for easier access.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -152,7 +154,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.12.zip`** from the [v1.2.12 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.12) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.13.zip`** from the [v1.2.13 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs. Queued will remain asleep until you use its toolbar icon or Alt+Shift+Q in each tab.
@@ -164,7 +166,7 @@ Changing the extension's ID (for example, by installing from a different folder)
 Queued is injected only when you activate it with the Chrome toolbar icon or **Alt+Shift+Q**. This opens the floating window without sending prompts. Once activated, you can reopen the panel from the compact live-status Queue dock.
 
 - **− Minimize** hides the window but keeps the dock and active Queued session available. It does not pause or stop a running queue.
-- **✕ Close / turn off** disconnects Queued's UI and page observer in the current tab. Reopen from the toolbar or shortcut. If a queue is running or you have unsaved changes, Queued asks for confirmation. It never affects another ChatGPT tab.
+- **✕ Close / turn off** is directly to the right of − and matches its neutral button styling. It disconnects Queued's UI and page observer in the current tab. Reopen from the toolbar or shortcut. If a queue is running or you have unsaved changes, Queued asks for confirmation. It never affects another ChatGPT tab.
 
 Open **⚙ Settings → Automatically turn off after** to choose **Never**, **1**, **5**, **10**, **15**, **30** or **60 minutes**. Five minutes is the default for existing installations; Never disables automatic sleep. The timer measures time since you last interacted with Queued, not manual ChatGPT activity. Active runs, unsaved drafts and unfinished storage writes prevent automatic turn-off. The duration is saved in local settings and applies to newly activated tabs; changing it also updates any currently active tabs.
 

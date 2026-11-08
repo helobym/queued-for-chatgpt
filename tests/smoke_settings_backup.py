@@ -61,6 +61,19 @@ with sync_playwright() as playwright:
     assert shutdown.inner_text() == "✕"
     assert "Minimize" in minimize.get_attribute("aria-label")
     assert "turn it off" in shutdown.get_attribute("aria-label")
+    # Close is the rightmost header control immediately following minimize.
+    assert shutdown.evaluate("(el)=>el.previousElementSibling?.dataset.action") == "toggle"
+    assert shutdown.bounding_box()["x"] > minimize.bounding_box()["x"]
+    # Both controls inherit the same neutral button styling in normal and dark mode.
+    assert page.evaluate("""() => {
+      const a=getComputedStyle(document.querySelector('.qfc-minimize'));
+      const b=getComputedStyle(document.querySelector('.qfc-power'));
+      return a.backgroundColor===b.backgroundColor &&
+        a.color===b.color &&
+        a.borderTopColor===b.borderTopColor &&
+        a.fontWeight===b.fontWeight &&
+        a.fontSize===b.fontSize;
+    }""")
     minimize.click()
     assert page.locator("#qfc-panel").is_hidden()
     assert page.locator(".qfc-dock").is_visible()
