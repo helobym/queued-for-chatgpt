@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.11 (2026-11-08)
+
+- Switched to on-demand per-tab activation via the Chrome toolbar and Alt+Shift+Q rather than injecting the full content script into every ChatGPT tab.
+- Added a compact per-tab power button and five-minute safe idle sleep. Running queues, unsaved edits and in-flight saves block automatic sleep; manual OFF confirms potentially disruptive changes.
+- Removed inactive tab UI, observers, injected CSS and listeners while preserving persistent queued prompts, Saved Workflows and notification preferences.
+- Added a final authoritative queue refresh under the sender lock to pick up workflow steps appended at the end-of-run boundary. An observed Stop-button lifecycle is now carried across delayed receipt acknowledgement, without weakening response proof.
+- Fixed mouse-wheel scroll chaining over expanded saved workflow prompts.
+- Updated targeted unit and Chromium regressions, permissions, documentation, and the GitHub ZIP release workflow.
+
+
 ## 1.2.10 (2026-11-07)
 
 - Made desktop/completion/automatic-stop notification settings obvious with ON/OFF switches, descriptions and Saved/Save failed feedback.

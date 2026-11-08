@@ -2,7 +2,7 @@
 <main data-app-shell-main-surface="browser"><div data-app-action-timeline-scroll role="region" id="timeline"></div></main>
 <form data-chatgpt-composer><div id="prompt-textarea" class="ProseMirror" contenteditable="true" role="textbox"></div><button type="button" data-testid="send-button">Send</button></form>
 <script>
- const data={}; const listeners=[]; window.chrome={storage:{onChanged:{addListener(cb){listeners.push(cb);}},local:{async get(input){const ks=typeof input==='string'?[input]:Array.isArray(input)?input:Object.keys(input||{});return Object.fromEntries(ks.map(k=>[k,data[k]]));},async set(next){for (const [k,v] of Object.entries(next)){const old=data[k];data[k]=JSON.parse(JSON.stringify(v));for(const cb of listeners)cb({[k]:{oldValue:old,newValue:data[k]}},'local');}}}},onChanged:{addListener(cb){listeners.push(cb);}}};
+ const data={}; const listeners=[]; window.chrome={storage:{onChanged:{addListener(cb){listeners.push(cb);},removeListener(cb){const i=listeners.indexOf(cb);if(i>=0)listeners.splice(i,1);}},local:{async get(input){const ks=typeof input==='string'?[input]:Array.isArray(input)?input:Object.keys(input||{});return Object.fromEntries(ks.map(k=>[k,data[k]]));},async set(next){for (const [k,v] of Object.entries(next)){const old=data[k];data[k]=JSON.parse(JSON.stringify(v));for(const cb of listeners)cb({[k]:{oldValue:old,newValue:data[k]}},'local');}}}},onChanged:{addListener(cb){listeners.push(cb);}}};
  let sent=0; window.__sentCount=0;
  document.querySelector('[data-testid="send-button"]').addEventListener('click',()=>{
    const editor=document.querySelector('#prompt-textarea');const content=editor.innerText.trim(); if(!content)return;

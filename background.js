@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.10 — configurable notification alerts and low-allocation audio. */
+/* Queued for ChatGPT v1.2.11 — on-demand per-tab activation and safe notifications. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;
@@ -264,6 +264,20 @@ function allowedSender(sender) {
 }
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!allowedSender(sender) || !message || message.app !== 'qfc-v1.1') return false;
+  if (message.command === 'tabSleep') {
+    const tabId = sender.tab?.id;
+    if (!Number.isSafeInteger(tabId)) return false;
+    void sequenceTab(tabId, async () => {
+      // Never touch another tab. Failures during navigation are harmless; the
+      // scoped CSS has no visible effect without #qfc-root.
+      try {
+        await chrome.scripting.removeCSS({ target: { tabId }, files: ['content.css'] });
+      } catch (_) {}
+      return { asleep: true };
+    }).then(data => sendResponse({ ok: true, data }),
+      error => sendResponse({ ok: false, error: String(error) }));
+    return true;
+  }
   serialized(async () => {
     if (message.command === 'runLifecycle') return runLifecycle(message, sender);
     if (message.command === 'notificationPermission')
@@ -291,18 +305,74 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 
+// No permanent page script, tab polling or resident wake listener.
+// Chrome grants activeTab only on a user toolbar/shortcut invocation.
+const tabTasks = new Map();
+function sequenceTab(tabId, task) {
+  const prior = tabTasks.get(tabId) || Promise.resolve();
+  const current = prior.catch(() => {}).then(task);
+  tabTasks.set(tabId, current);
+  void current.finally(() => {
+    if (tabTasks.get(tabId) === current) tabTasks.delete(tabId);
+  }).catch(() => {});
+  return current;
+}
+function isChatGPTTab(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname === 'chatgpt.com';
+  } catch (_) { return false; }
+}
+async function sendUi(tabId, action) {
+  return chrome.tabs.sendMessage(tabId, { app: 'qfc-ui-v1', action });
+}
+async function openOrToggleTab(tab) {
+  if (!Number.isSafeInteger(tab?.id)) return;
+  return sequenceTab(tab.id, async () => {
+    // Command events may omit the URL. Resolve it without needing the broad tabs permission.
+    let target = tab;
+    if (!target.url && chrome.tabs.get) target = await chrome.tabs.get(tab.id);
+    if (!isChatGPTTab(target?.url)) return;
+    let active = false;
+    try { active = (await sendUi(tab.id, 'status'))?.active === true; }
+    catch (_) { /* A sleeping tab has no message receiver. */ }
+    if (active) {
+      await sendUi(tab.id, 'toggle-panel');
+      return;
+    }
+    // CSS is installed only for an activated tab and removed on successful sleep.
+    await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['core.js', 'content.js']
+      });
+      const opened = await sendUi(tab.id, 'open-panel');
+      if (!opened?.active) throw new Error('Queued did not initialize in this tab.');
+    } catch (error) {
+      try {
+        await chrome.scripting.removeCSS({ target: { tabId: tab.id }, files: ['content.css'] });
+      } catch (_) { /* Navigation can invalidate the CSS target. */ }
+      throw error;
+    }
+  });
+}
+function requestTabOpening(tab) {
+  return openOrToggleTab(tab).catch(error => {
+    console.warn('[Queued for ChatGPT] Could not activate selected tab.', error);
+  });
+}
+
 // Chrome Commands is event-driven: no persistent worker or tab polling.
 chrome.commands.onCommand.addListener(async (command, tab) => {
   if (command !== 'toggle-queue-panel') return;
   try {
-    const target = Number.isInteger(tab?.id) ? tab :
+    const target = Number.isSafeInteger(tab?.id) ? tab :
       (await chrome.tabs.query({ active: true, lastFocusedWindow: true }))[0];
-    if (!Number.isInteger(target?.id)) return;
-    // Only an installed ChatGPT content script accepts this message. A missing
-    // receiver (other websites, closed or unloaded tabs) is a harmless no-op.
-    await chrome.tabs.sendMessage(target.id, { app: 'qfc-ui-v1', action: 'toggle-panel' });
-  } catch (_) { /* No receiver or tab disappeared. Do not affect queue execution. */ }
+    await requestTabOpening(target);
+  } catch (_) { /* Tab closed before the shortcut was delivered. */ }
 });
+chrome.action?.onClicked?.addListener(requestTabOpening);
 
 // Tab lifecycle events are passive and event-driven. A loading navigation
 // is not sufficient evidence of a discard; give the discarded event priority

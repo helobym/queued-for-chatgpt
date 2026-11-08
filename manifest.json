@@ -2,28 +2,14 @@
   "manifest_version": 3,
   "name": "Queued for ChatGPT",
   "short_name": "Queued for ChatGPT",
-  "version": "1.2.10",
-  "description": "Lightweight ChatGPT queues and workflows with accessible, adjustable desktop notification alerts.",
+  "version": "1.2.11",
+  "description": "Lightweight, on-demand per-tab ChatGPT queues and workflows with safe idle sleep and notifications.",
   "permissions": [
     "storage",
     "notifications",
-    "offscreen"
-  ],
-  "content_scripts": [
-    {
-      "matches": [
-        "https://chatgpt.com/*"
-      ],
-      "js": [
-        "core.js",
-        "content.js"
-      ],
-      "css": [
-        "content.css"
-      ],
-      "run_at": "document_idle",
-      "all_frames": false
-    }
+    "offscreen",
+    "activeTab",
+    "scripting"
   ],
   "icons": {
     "16": "icons/icon16.png",
@@ -40,5 +26,8 @@
       },
       "description": "Open or close the Queued for ChatGPT panel"
     }
+  },
+  "action": {
+    "default_title": "Open Queued for ChatGPT in this tab"
   }
 }

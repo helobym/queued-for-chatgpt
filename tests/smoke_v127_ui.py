@@ -32,10 +32,13 @@ with sync_playwright() as playwright:
       };
       chrome.commands = {onCommand:{addListener(fn){window.__qfcCommand=fn;}}};
       chrome.tabs = {
-        async query() { return [{id:17}]; },
+        async query() { return [{id:17,url:'https://chatgpt.com/c/v127'}]; },
+        async get(id) { return {id,url:'https://chatgpt.com/c/v127'}; },
         async sendMessage(id,message) {
           window.__lastCommandTab = id;
-          for (const fn of listeners) fn(message,{id:'mock-qfc-extension'},()=>{});
+          return new Promise(resolve => {
+            for (const fn of listeners) fn(message,{id:'mock-qfc-extension'},resolve);
+          });
         }
       };
       Object.defineProperty(navigator,'locks',{configurable:true,value:{

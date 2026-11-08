@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.10 — lightweight notification settings and audio. */
+/* Queued for ChatGPT v1.2.11 — on-demand per-tab runner and safe idle sleep. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -44,6 +44,7 @@
   let root, queueList, workflowsList, statusLine, queueTextArea, workflowSearch;
   let pageObserver, routeTimer, lastAssistantChange = Date.now();
   let routeLoadGeneration = 0;
+  let trackingSendAttempt = false, observedStopDuringSend = false;
   let lastPathname = location.pathname;
   let tempSubmittedAt = 0;
   let navigateToExistingChat = false;
@@ -70,6 +71,43 @@
   let settingsRevision = 0, savedSettingsRevision = 0;
   let notificationWriteLoop = null;
   let notificationSaveStatus = 'Ready';
+  const IDLE_SLEEP_MS = 5 * 60 * 1000;
+  let idleTimer = null, lastQueuedInteraction = Date.now();
+  let disposing = false, disposed = false, initialized = false;
+  let initializationReady = null, runnerPromise = null, terminalEventPromise = null;
+  let uiOperations = 0;
+  const cleanupListeners = [];
+  const transientTimers = new Set();
+  const pendingDownloadUrls = new Set();
+  function clearIdleTimer() {
+    if (idleTimer !== null) clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+  function hasUnsavedInput() {
+    return Boolean(state.workflowDraft || state.editingQueueId ||
+      C.normalize(queueTextArea?.value) ||
+      C.normalize(root?.querySelector('#qfc-workflow-name')?.value));
+  }
+  function canSleep() {
+    return !disposed && !disposing && !state.running && !runnerPromise &&
+      !state.routeLoading && !uiOperations && !notificationWriteLoop &&
+      !pendingWorkflowLoads.size && !hasUnsavedInput();
+  }
+  function scheduleIdleSleep() {
+    clearIdleTimer();
+    if (!canSleep()) return;
+    const delay = Math.max(0, IDLE_SLEEP_MS - (Date.now() - lastQueuedInteraction));
+    idleTimer = setTimeout(() => {
+      idleTimer = null;
+      if (canSleep()) void sleepTab(false);
+    }, delay);
+  }
+  function queuedInteraction() {
+    if (disposed || disposing) return;
+    lastQueuedInteraction = Date.now();
+    scheduleIdleSleep();
+  }
+
   // Persist at most one settings record at a time; coalesce rapid changes and
   // avoid newer local selections being replaced by stale storage events.
   async function persistNotificationSettings() {
@@ -98,6 +136,7 @@
     finally {
       notificationWriteLoop = null;
       if (savedSettingsRevision < settingsRevision) void persistNotificationSettings();
+      else scheduleIdleSleep();
     }
   }
   function saveNotificationSettings(next) {
@@ -301,6 +340,7 @@
       if (remaining) pendingWorkflowLoads.set(route, remaining);
       else pendingWorkflowLoads.delete(route);
       wake();
+      scheduleIdleSleep();
     }
   }
   async function editWithLock(fn) {
@@ -338,6 +378,7 @@
       if (generation === routeLoadGeneration) {
         state.routeLoading = false;
         renderHeader();
+        scheduleIdleSleep();
       }
     }
   }
@@ -396,6 +437,7 @@
             <small>Drag here to move · local · lightweight</small>
           </div>
           <div class="qfc-head-actions">
+            <button type="button" class="qfc-small qfc-power" data-action="turn-off" title="Turn off Queued for this ChatGPT tab" aria-label="Turn off Queued for this ChatGPT tab">⏻</button>
             <button type="button" class="qfc-small" data-action="open-settings" title="Notification settings" aria-label="Notification settings" aria-pressed="false">⚙</button>
             <button type="button" class="qfc-small" data-action="reset-position" title="Reset panel position" aria-label="Reset panel position">⌖</button>
             <button type="button" class="qfc-small" data-action="toggle" title="Close panel" aria-label="Close panel">✕</button>
@@ -529,7 +571,24 @@
     statusLine = root.querySelector('#qfc-status');
     queueTextArea = root.querySelector('#qfc-compose');
     workflowSearch = root.querySelector('#qfc-search');
-    root.addEventListener('click', event => { onPanelClick(event).catch(error => notify(error.message || 'Unable to save changes.')); });
+    root.addEventListener('click', event => {
+      queuedInteraction();
+      if (event.target.closest('button[data-action]')?.dataset.action === 'turn-off') {
+        void sleepTab(true).catch(error => {
+          disposing = false;
+          notify(error.message || 'Could not turn off Queued.');
+          scheduleIdleSleep();
+        });
+        return;
+      }
+      uiOperations++;
+      void onPanelClick(event).catch(error => notify(error.message || 'Unable to save changes.'))
+        .finally(() => { uiOperations--; scheduleIdleSleep(); });
+    });
+    root.addEventListener('input', queuedInteraction);
+    root.addEventListener('change', queuedInteraction);
+    root.addEventListener('keydown', queuedInteraction);
+    root.addEventListener('pointerdown', queuedInteraction);
     workflowSearch.addEventListener('input', renderWorkflows);
     root.querySelector('#qfc-import-file').addEventListener('change', importFile);
     root.addEventListener('change', event => {
@@ -665,7 +724,9 @@
       setPanelPosition(panelOffsetX + movement[0] * size,
                        panelOffsetY + movement[1] * size, { save: true });
     });
-    window.addEventListener('resize', () => setPanelPosition(panelOffsetX, panelOffsetY, { save: true }));
+    const onResize = () => setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
+    window.addEventListener('resize', onResize);
+    cleanupListeners.push(() => window.removeEventListener('resize', onResize));
   }
   function dockDisplay() {
     if (!state.route || state.routeLoading) return { phase: 'loading', label: 'Loading', suffix: '' };
@@ -957,12 +1018,15 @@
     state.running = false;
     state.senderLockRoute = null;
     newChatHandoff = null;
+    trackingSendAttempt = false;
+    observedStopDuringSend = false;
     setStatus(message);
     wake();
     // Pagehide leaves the background record for tabs.onUpdated(discarded) or
     // tabs.onRemoved; an unload is not evidence of success or failure.
     if (finishedRun && outcome !== 'abandoned')
-      void runEvent(finishedRun, outcome, reason);
+      terminalEventPromise = runEvent(finishedRun, outcome, reason);
+    scheduleIdleSleep();
   }
   function setTab(tab) {
     state.tab = tab;
@@ -975,10 +1039,11 @@
   function togglePanel() {
     if (!root) return;
     state.open = !state.open;
-    STORAGE.set({ [C.SETTINGS_KEY]: { open: state.open } }).catch(() => {});
+    // Panel visibility is tab-local; preserve the prior shared setting record unchanged.
     render();
     // Clamp the expanded panel (or narrower dock) without resetting drag offsets.
     setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
+    queuedInteraction();
   }
   async function copyPromptText(text, button, resetLabel) {
     try {
@@ -995,12 +1060,14 @@
       }
     }
     // Feedback is local to the button and never changes execution status.
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      transientTimers.delete(timer);
       if (button.isConnected) {
         button.textContent = 'Copy';
         button.setAttribute('aria-label', resetLabel);
       }
     }, 1600);
+    transientTimers.add(timer);
   }
   async function onPanelClick(event) {
     const button = event.target.closest('button[data-action]');
@@ -1201,10 +1268,16 @@
   }
   function downloadJson(payload, filename) {
     const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], {type: 'application/json'}));
+    pendingDownloadUrls.add(url);
     const anchor = document.createElement('a');
     anchor.href = url; anchor.download = filename;
     root.append(anchor); anchor.click(); anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const timer = setTimeout(() => {
+      transientTimers.delete(timer);
+      pendingDownloadUrls.delete(url);
+      URL.revokeObjectURL(url);
+    }, 1000);
+    transientTimers.add(timer);
   }
   async function importFile(event) {
     const file = event.target.files?.[0]; event.target.value = '';
@@ -1336,6 +1409,8 @@
         if (newChatHandoff?.from === route) newChatHandoff.clickedAt = Date.now();
         // This is an attempt, not proof of acceptance. Receipt verification
         // in the caller must succeed before changing to "awaiting".
+        trackingSendAttempt = true;
+        observedStopDuringSend = false;
         button.click();
         return true;
       }
@@ -1465,6 +1540,12 @@
             await signalOrTimeout(250);
             continue;
           }
+          // A second tab may append steps immediately after the previous
+          // completion. Refresh under the existing sender lock before success.
+          const latest = await rpc('getQueue', { route });
+          if (!healthyRoute(route)) return;
+          applyQueue(route, latest);
+          if (state.queue.length) continue;
           break;
         }
         const item = state.queue[0];
@@ -1487,8 +1568,9 @@
         if (!received) { pause('Could not confirm sent message. Check ChatGPT before continuing.', 'interrupted', 'send'); return; }
         await queueOp('awaiting', { id: item.id }, route); render();
         setStatus('Waiting for response to finish…');
-        const finished = await waitForResponse(oldAssistant, route);
+        const finished = await waitForResponse(oldAssistant, route, observedStopDuringSend);
         if (!finished) { pause('Response completion uncertain. Verify ChatGPT, then use ✓ Done.', 'interrupted', 'response'); return; }
+        trackingSendAttempt = false;
         if (!healthyRoute(route)) return;
         await queueOp('complete', { id: item.id }, route); recordVerified(item); render();
         setStatus('Response complete; continuing queue…');
@@ -1544,12 +1626,13 @@
       await queueOp('awaiting', { id: handoff.id }, stableRoute);
       setStatus(evidence.receipt === 'assistant'
         ? 'First reply detected; verifying completion…' : 'Waiting for the first response…');
-      if (!await waitForResponse(previousAssistant, stableRoute, evidence.sawStop)) {
+      if (!await waitForResponse(previousAssistant, stableRoute, evidence.sawStop || observedStopDuringSend)) {
         pause('First response completion uncertain. Use ✓ Done after reviewing.', 'interrupted', 'response'); return;
       }
       if (!healthyRoute(stableRoute)) return;
       await queueOp('complete', { id: handoff.id }, stableRoute);
       recordVerified(first);
+      trackingSendAttempt = false;
       newChatHandoff = null;
       setStatus('First response complete; continuing queue…');
       await runQueue(stableRoute);
@@ -1583,8 +1666,9 @@
     // Detect edits that happened in another tab after the user approved starting.
     const initialRevision = state.queueRev;
     state.running = true;
+    clearIdleTimer();
     setStatus(workflow ? `Preparing workflow “${workflow.name}”…` : 'Starting queue…');
-    navigator.locks.request('qfc-queue-' + route, { ifAvailable: true }, async lock => {
+    const pendingRunner = navigator.locks.request('qfc-queue-' + route, { ifAvailable: true }, async lock => {
       if (!lock) { pause('Another tab is controlling this conversation queue.'); return; }
       state.senderLockRoute = route;
       renderHeader();
@@ -1620,7 +1704,61 @@
         pause(workflow ? 'Could not start workflow. Check queue and storage before retrying.' : 'Unable to load current queue.');
         console.warn('[Queued for ChatGPT]', error);
       }
-    }).catch(error => { pause('Unable to lock the conversation queue.'); console.warn('[Queued for ChatGPT]', error); });
+    }).catch(error => {
+      pause('Unable to lock the conversation queue.');
+      console.warn('[Queued for ChatGPT]', error);
+    }).finally(() => {
+      if (runnerPromise === pendingRunner) runnerPromise = null;
+      scheduleIdleSleep();
+    });
+    runnerPromise = pendingRunner;
+  }
+
+  async function sleepTab(manual) {
+    if (disposed || disposing) return false;
+    if (manual) {
+      if (uiOperations || pendingWorkflowLoads.size || notificationWriteLoop || state.routeLoading) {
+        notify('Finish the current save or load before turning Queued off.');
+        return false;
+      }
+      if (state.running && !confirm(
+        'Pause this running queue and turn off Queued in this tab? Uncertain prompts will need review before restarting.')) return false;
+      if (hasUnsavedInput() && !confirm(
+        'Discard the unsaved Queued text or workflow edit and turn off only this tab?')) return false;
+    } else if (!canSleep()) return false;
+    disposing = true;
+    clearIdleTimer();
+    if (state.running) pause('Paused by you.', 'manual');
+    // The lock callback can still be awaiting an RPC or receipt check.
+    // Never tear down its state before it has released the Web Lock.
+    if (runnerPromise) await runnerPromise.catch(() => {});
+    if (terminalEventPromise) await terminalEventPromise.catch(() => {});
+    if (notificationWriteLoop) await notificationWriteLoop.catch(() => {});
+    for (const timer of transientTimers) clearTimeout(timer);
+    transientTimers.clear();
+    for (const url of pendingDownloadUrls) URL.revokeObjectURL(url);
+    pendingDownloadUrls.clear();
+    if (routeTimer) clearTimeout(routeTimer);
+    routeTimer = null;
+    pageObserver?.disconnect();
+    wake();
+    for (const cleanup of cleanupListeners.splice(0)) cleanup();
+    try {
+      const handle = root?.querySelector('.qfc-drag-handle');
+      if (panelDrag && handle?.hasPointerCapture(panelDrag.id)) handle.releasePointerCapture(panelDrag.id);
+    } catch (_) {}
+    panelDrag = null;
+    // The worker serializes CSS cleanup with shortcut reactivation per tab.
+    // No prompts, settings or workflow records are removed.
+    try { await rpc('tabSleep'); } catch (_) {}
+    root?.remove();
+    root = queueList = workflowsList = statusLine = queueTextArea = workflowSearch = null;
+    state.queue = []; state.workflows = []; state.workflowDraft = null;
+    expandedWorkflowIds.clear(); temporaryRouteCache.clear(); temporaryRouteKeys.clear();
+    signalListeners.clear(); pendingWorkflowLoads.clear();
+    disposed = true;
+    globalThis.__qfcContentLoaded = false;
+    return true;
   }
 
   function scheduleRouteCheck() {
@@ -1650,12 +1788,22 @@
         // Removals can signal the Stop button disappearing or navigation.
         if (change.removedNodes.length) touched = true;
       }
-      if (touched) { wake(); if (location.pathname !== lastPathname) scheduleRouteCheck(); }
+      if (touched) {
+        // Stop may appear and disappear while the coordinator acknowledges the
+        // user receipt. Retain observed generation evidence for this one send.
+        if (trackingSendAttempt && isGenerating()) observedStopDuringSend = true;
+        wake();
+        if (location.pathname !== lastPathname) scheduleRouteCheck();
+      }
     });
     pageObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
     window.addEventListener('popstate', scheduleRouteCheck);
     window.addEventListener('hashchange', scheduleRouteCheck);
-    document.addEventListener('click', event => {
+    cleanupListeners.push(() => {
+      window.removeEventListener('popstate', scheduleRouteCheck);
+      window.removeEventListener('hashchange', scheduleRouteCheck);
+    });
+    const onDocumentClick = event => {
       // Only a real user click; don't confuse the disappearance of Stop after
       // manual cancellation with successful assistant completion.
       if (state.running && event.isTrusted && event.target.closest?.(STOP_SELECTORS)) {
@@ -1674,22 +1822,29 @@
         const send = findSendButton(editor);
         if (editor && send && (event.target === send || send.contains(event.target)) && C.normalize(editorText(editor))) tempSubmittedAt = Date.now();
       }
-    }, true);
-    document.addEventListener('keydown', event => {
+    };
+    document.addEventListener('click', onDocumentClick, true);
+    cleanupListeners.push(() => document.removeEventListener('click', onDocumentClick, true));
+    const onDocumentKeydown = event => {
       if (currentRoute() || event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
       const editor = findEditor();
       if (editor && (event.target === editor || editor.contains(event.target)) && C.normalize(editorText(editor))) tempSubmittedAt = Date.now();
-    }, true);
-    window.addEventListener('pagehide', () => pause('Tab closed or navigating away.', 'abandoned'));
+    };
+    document.addEventListener('keydown', onDocumentKeydown, true);
+    cleanupListeners.push(() => document.removeEventListener('keydown', onDocumentKeydown, true));
+    const onPageHide = () => pause('Tab closed or navigating away.', 'abandoned');
+    window.addEventListener('pagehide', onPageHide);
+    cleanupListeners.push(() => window.removeEventListener('pagehide', onPageHide));
   }
   async function initialize() {
     initPanel();
     try {
       const [record, settings] = await Promise.all([
-        rpc('getWorkflows'), STORAGE.get([C.SETTINGS_KEY, C.NOTIFICATION_SETTINGS_KEY])
+        rpc('getWorkflows'), STORAGE.get([C.NOTIFICATION_SETTINGS_KEY])
       ]);
       applyWorkflows(record);
-      state.open = Boolean(settings[C.SETTINGS_KEY]?.open);
+      // Opening is local to an activation, not the obsolete cross-tab open flag.
+      state.open = false;
       notificationSettings = C.cleanNotificationSettings(settings[C.NOTIFICATION_SETTINGS_KEY]);
       confirmedNotificationSettings = notificationSettings;
       if (notificationSettings.soundDuration !== 'once') customSecondsDraft = notificationSettings.soundDuration;
@@ -1699,17 +1854,8 @@
     render();
     setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
     observePage();
-    // The service worker sends only an extension-originated UI command.
-    // Register after settings hydration so an early shortcut cannot be undone
-    // by the initial asynchronous open-state restoration.
-    chrome.runtime.onMessage.addListener((message, sender) => {
-      if (sender?.id !== chrome.runtime.id ||
-          message?.app !== 'qfc-ui-v1' || message.action !== 'toggle-panel') return false;
-      togglePanel();
-      return false;
-    });
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local') return;
+    const onStorageChanged = (changes, area) => {
+      if (disposed || disposing || area !== 'local') return;
       if (changes[C.NOTIFICATION_SETTINGS_KEY] && !notificationWriteLoop &&
           settingsRevision === savedSettingsRevision) {
         notificationSettings = C.cleanNotificationSettings(changes[C.NOTIFICATION_SETTINGS_KEY].newValue);
@@ -1719,8 +1865,35 @@
       }
       if (changes[C.WORKFLOWS_KEY]) applyWorkflows(changes[C.WORKFLOWS_KEY].newValue);
       if (state.route && changes[C.queueKey(state.route)]) applyQueue(state.route, changes[C.queueKey(state.route)].newValue);
-    });
+    };
+    chrome.storage.onChanged.addListener(onStorageChanged);
+    cleanupListeners.push(() => chrome.storage.onChanged.removeListener?.(onStorageChanged));
+    initialized = true;
+    queuedInteraction();
   }
-  if (document.body) initialize();
-  else document.addEventListener('DOMContentLoaded', initialize, { once: true });
+  function onUiMessage(message, sender, sendResponse) {
+    if (sender?.id !== chrome.runtime.id || message?.app !== 'qfc-ui-v1') return false;
+    if (message.action === 'status') {
+      sendResponse({ active: !disposed && !disposing, ready: initialized });
+      return false;
+    }
+    if (message.action !== 'open-panel' && message.action !== 'toggle-panel') return false;
+    void Promise.resolve(initializationReady).then(() => {
+      if (disposed || disposing || !root) return { active: false };
+      if (message.action === 'toggle-panel') togglePanel();
+      else if (!state.open) {
+        state.open = true;
+        render();
+        setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
+      }
+      queuedInteraction();
+      return { active: true, ready: true };
+    }).then(sendResponse, () => sendResponse({ active: false }));
+    return true;
+  }
+  chrome.runtime.onMessage.addListener(onUiMessage);
+  cleanupListeners.push(() => chrome.runtime.onMessage.removeListener?.(onUiMessage));
+  if (document.body) initializationReady = initialize();
+  else initializationReady = new Promise(resolve => document.addEventListener(
+    'DOMContentLoaded', () => resolve(initialize()), { once: true }));
 })();

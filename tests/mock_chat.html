@@ -9,7 +9,7 @@
       local: {
         async get(input) { const keys = typeof input === 'string' ? [input] : Array.isArray(input) ? input : Object.keys(input || {}); return Object.fromEntries(keys.map(k => [k, memory[k]])); },
         async set(next) { for (const [k,v] of Object.entries(next)) { const old = memory[k]; memory[k] = JSON.parse(JSON.stringify(v)); for (const cb of listeners) cb({ [k]: { oldValue: old, newValue: memory[k] } }, 'local'); } }
-      }, onChanged: { addListener: cb => listeners.push(cb) }
+      }, onChanged: { addListener: cb => listeners.push(cb), removeListener: cb => { const i=listeners.indexOf(cb); if(i>=0)listeners.splice(i,1); } }
     };
     const form = document.getElementById('mock-composer');
     const editor = document.getElementById('prompt-textarea');

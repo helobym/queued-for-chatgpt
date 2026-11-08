@@ -6,19 +6,33 @@ const vm = require('node:vm');
 const path = require('node:path');
 const base = path.resolve(__dirname, '..');
 function createWorker(stored = {}) {
-  let listener, commandListener, rejectSend = false;
-  const sent = [];
+  let listener, commandListener, actionListener, rejectSend = false;
+  const sent = [], injected = [], css = [];
+  const activeTabs = new Set();
   const db = JSON.parse(JSON.stringify(stored));
   const ext = { id: 'test-extension' };
   const context = vm.createContext({
     URL, Date, Promise, Math, Set, console, crypto: require('node:crypto').webcrypto,
     chrome: {
       commands: { onCommand: { addListener(fn) { commandListener = fn; } } },
+      action: { onClicked: { addListener(fn) { actionListener = fn; } } },
+      scripting: {
+        async insertCSS(opts) { css.push(['insert',opts.target.tabId]); },
+        async removeCSS(opts) { css.push(['remove',opts.target.tabId]); },
+        async executeScript(opts) { injected.push([opts.target.tabId,...opts.files]); }
+      },
       tabs: {
-        async query() { return [{id: 42}]; },
+        async query() { return [{id:42,url:'https://chatgpt.com/c/mychat'}]; },
+        async get(id) { return {id,url:'https://chatgpt.com/c/mychat'}; },
         async sendMessage(id, message) {
           if (rejectSend) throw new Error('No receiving end');
           sent.push({id, message});
+          if (message.action === 'status') {
+            if (!activeTabs.has(id)) throw new Error('No receiving end');
+            return {active:true};
+          }
+          if (message.action === 'open-panel') { activeTabs.add(id); return {active:true}; }
+          return {active:true};
         }
       },
       runtime: { id: ext.id, onMessage: { addListener(fn) { listener = fn; } } },
@@ -30,7 +44,9 @@ function createWorker(stored = {}) {
   });
   context.importScripts = (...paths) => paths.forEach(file => vm.runInContext(fs.readFileSync(path.join(base, file), 'utf8'), context, { filename: file }));
   vm.runInContext(fs.readFileSync(path.join(base, 'background.js'), 'utf8'), context, { filename: 'background.js' });
-  return { db, sent, command(command, tab) { return commandListener(command, tab); },
+  return { db, sent, injected, css,
+    command(command, tab) { return commandListener(command, tab); },
+    action(tab) { return actionListener(tab); },
     rejectReceiver() { rejectSend = true; },
     message(payload) {
     return new Promise(resolve => {
@@ -104,17 +120,25 @@ test('temporary chat migration preserves workflow origin and completed preview',
   assert.equal((await bg.message({ command: 'getQueue', route: 'chat:mychat' })).data.lastCompleted.workflow.step, 1);
 });
 
-test('native panel shortcut targets one tab, ignores unknown commands and falls back to focused tab', async () => {
+test('toolbar and shortcut wake only the selected ChatGPT tab and toggle existing sessions', async () => {
   const bg = createWorker();
-  await bg.command('another-command', {id: 7});
-  assert.equal(bg.sent.length, 0);
-  await bg.command('toggle-queue-panel', {id: 7});
-  assert.equal(bg.sent[0].id, 7);
-  assert.equal(bg.sent[0].message.app, 'qfc-ui-v1');
-  assert.equal(bg.sent[0].message.action, 'toggle-panel');
+  await bg.command('another-command', {id:7,url:'https://chatgpt.com/c/one'});
+  assert.equal(bg.injected.length,0);
+  await bg.command('toggle-queue-panel', {id:7,url:'https://chatgpt.com/c/one'});
+  assert.equal(bg.injected.length,1);
+  assert.deepEqual(bg.injected[0],[7,'core.js','content.js']);
+  assert.deepEqual(bg.css[0],['insert',7]);
+  assert.deepEqual(bg.sent.slice(0,2).map(x=>x.message.action),['status','open-panel']);
+  await bg.command('toggle-queue-panel',{id:7,url:'https://chatgpt.com/c/one'});
+  assert.equal(bg.injected.length,1);
+  assert.equal(bg.sent.at(-1).message.action,'toggle-panel');
   await bg.command('toggle-queue-panel');
-  assert.equal(bg.sent[1].id, 42);
+  assert.equal(bg.injected[1][0],42);
+  await bg.action({id:31,url:'https://chatgpt.com/new'});
+  assert.equal(bg.injected[2][0],31);
+  await bg.action({id:50,url:'https://example.com/'});
+  assert.equal(bg.injected.length,3);
   bg.rejectReceiver();
-  await assert.doesNotReject(bg.command('toggle-queue-panel', {id: 9}));
-  assert.equal(bg.sent.length, 2);
+  await assert.doesNotReject(bg.command('toggle-queue-panel',{id:9,url:'https://chatgpt.com/c/one'}));
+  assert.deepEqual(bg.css.at(-1),['remove',9]);
 });

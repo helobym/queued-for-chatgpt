@@ -1,31 +1,29 @@
-QUEUED FOR CHATGPT — v1.2.9 to v1.2.10
+QUEUED FOR CHATGPT — v1.2.10 to v1.2.11
 
-[ ] Export important Saved Queue Workflows before upgrading.
-[ ] Let active prompts finish or use Pause; review any uncertain in-flight item.
-[ ] Keep the SAME installed extension directory and extension ID to preserve local queues and workflows.
-[ ] Download queued-for-chatgpt-v1.2.10.zip from GitHub Release v1.2.10 (Assets).
-[ ] Extract into the installed folder, replacing source files; keep offscreen.html and offscreen.js.
-[ ] At chrome://extensions click Reload, confirm version 1.2.10 and refresh all ChatGPT tabs.
-[ ] Verify Queue, Workflows, compact disclosure, Copy, Load and Start remain unchanged.
-[ ] Open the floating panel's ⚙ Notification Settings; verify Back retains selected view and expanded workflows.
-[ ] Toggle Desktop notifications, Workflow completed and Stopped automatically, confirming ON/OFF and Saved status.
-[ ] Select a custom tone; test Play Once and custom duration values including 1, 14 and 60 seconds.
-[ ] Verify invalid custom durations are rejected without overwriting the last saved preference.
-[ ] Set custom volume from 0% to 100%; verify Test sound (2s) is silent/disabled at 0%.
-[ ] Verify Test notification requests one silent desktop alert and does not start or modify queued work.
-[ ] Confirm System Default and Silent disable custom duration, volume and preview.
-[ ] Confirm Until dismissed is best effort and does not promise a timed desktop popup.
-[ ] Confirm settings persist after closing/reopening the panel and synchronize across ChatGPT tabs.
-[ ] Run a harmless two-step workflow; verify exactly one terminal notification and correct verified count.
-[ ] If custom audio is selected, ensure it does not block queue progression, overlap or play indefinitely.
-[ ] Confirm manual Pause and manually stopping a ChatGPT response never generate automatic success alerts.
-[ ] Confirm Chrome Memory Saver discard stays an interruption, not success, where OS delivery allows.
-[ ] Verify New Chat and Project first-message handoff, cross-tab sender locking and uncertainty review.
-[ ] Compare ChromeOS idle CPU/memory and active 60-second alert resource usage with v1.2.9.
+[ ] Allow all active workflows to finish, or Pause and review any sending/awaiting items before upgrading.
+[ ] Export important Saved Queue Workflows to a JSON backup.
+[ ] Keep the SAME installed extension directory and extension ID. Never uninstall or load a second copy.
+[ ] Download queued-for-chatgpt-v1.2.11.zip from GitHub Release v1.2.11.
+[ ] Extract the release files into the original extension folder, replacing matching files.
+[ ] Open chrome://extensions and Reload the existing extension. Confirm version 1.2.11.
+[ ] Refresh existing ChatGPT tabs. Queued now starts asleep, with no floating dock until activated.
+[ ] Click the Queued toolbar icon or press Alt+Shift+Q: panel appears in that tab without sending prompts.
+[ ] Toggle the panel using Alt+Shift+Q; it opens/closes without starting queued work.
+[ ] Turn off using ⏻: the current tab's UI and observer disappear; another ChatGPT tab stays unchanged.
+[ ] Reopen a sleeping tab with the shortcut or toolbar icon; stored workflows and queued prompts remain.
+[ ] Confirm the idle session sleeps after about five minutes of no Queued interaction.
+[ ] Confirm ordinary manual ChatGPT activity does not start or reactivate Queued.
+[ ] Confirm unfinished workflow edits/queue composer text and active sends prevent automatic sleep.
+[ ] Manually turn off during a running test queue: confirmation pauses safely, never sends a duplicate or false success alert.
+[ ] Verify saved workflows, their steps, Load, Start, Copy, Recent Activity and queue status remain intact.
+[ ] Expand a long workflow and use wheel/trackpad over the prompt text; reaching the end scrolls the outer Workflows list.
+[ ] Verify notification ON/OFF preferences, sound, volume and duration still match v1.2.10.
+[ ] Test New Chat, Project landing, repeated prompts, multi-tab locking and incomplete response safeguards.
+[ ] Test a workflow Load near the end of a running queue; new steps already committed before final refresh are not lost.
+[ ] Compare idle/active extension memory and CPU in Chrome Task Manager with v1.2.10.
 
 IMPORTANT:
-- Original custom tones are generated locally with at most two oscillator/gain pairs; no external ringtone downloads.
-- Custom sound duration never controls how long the ChromeOS desktop popup is shown.
-- The selected custom volume cannot override system mute or ChromeOS notification restrictions.
-- Audio and notification delivery remain best effort if ChromeOS suppresses them.
-- No queue schema migration, additional permissions or change to Send/response verification logic.
+- GitHub-hosted unpacked extensions do not update themselves; replace files and Reload in place.
+- Settings/queues/workflows remain in chrome.storage.local with unchanged keys.
+- Chrome's memory reclamation is nondeterministic; sleep disconnects observers but exact RAM savings are not guaranteed.
+- No timers, network updaters, always-on launcher scripts, or additional third-party dependencies are installed.

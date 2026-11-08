@@ -21,6 +21,7 @@
 #qfc-root .qfc-drag-icon { color: #729484; font-size: 18px; vertical-align: -1px; }
 #qfc-root .qfc-head-actions { display: flex; gap: 4px; flex-shrink: 0; }
 #qfc-root .qfc-head-actions button { min-width: 29px; }
+#qfc-root .qfc-head-actions .qfc-power { font-size: 18px; line-height: 1; color: #80511d; background: #fff9f0; border-color: #ead8b8; }
 #qfc-root .qfc-head small { display: block; color: #66776d; margin-top: 1px; }
 #qfc-root .qfc-nav { display: flex; border-bottom: 1px solid #e1e8e3; gap: 5px; padding: 5px 9px 0; }
 #qfc-root .qfc-nav button { flex: 1; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 2px; }
@@ -57,7 +58,7 @@
 #qfc-root .qfc-workflow-save { margin: 12px 0 9px; padding: 10px 0 3px; border-top: 1px solid #e2ebe4; }
 #qfc-root .qfc-workflow-save button { margin-top: 7px; }
 #qfc-root .qfc-workflow-title { font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
-#qfc-root .qfc-workflow-details { border: 1px solid #dbe6de; border-radius: 7px; background: #f7faf8; max-height: min(340px, 45vh); overflow-y: auto; overscroll-behavior: contain; margin: 7px 0 2px; padding: 0 9px; }
+#qfc-root .qfc-workflow-details { border: 1px solid #dbe6de; border-radius: 7px; background: #f7faf8; max-height: min(340px, 45vh); overflow-y: auto; overscroll-behavior: auto; margin: 7px 0 2px; padding: 0 9px; }
 #qfc-root .qfc-workflow-prompt { padding: 9px 0; }
 #qfc-root .qfc-workflow-prompt + .qfc-workflow-prompt { border-top: 1px solid #dbe6de; }
 #qfc-root .qfc-workflow-prompt-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 5px; }
@@ -110,6 +111,7 @@
   #qfc-root .qfc-panel { background: #202a25; color: #edf3ee; border-color: #4b6051; }
   #qfc-root button { background: #2e3c33; color: #e7eee9; border-color: #506252; }
   #qfc-root button:hover:not(:disabled) { background: #405345; }
+  #qfc-root .qfc-head-actions .qfc-power { color: #f0c58b; background: #3c3129; border-color: #70513a; }
   #qfc-root .qfc-primary, #qfc-root .qfc-dock { background: #157650; color: #fff; border-color: #157650; }
   #qfc-root .qfc-primary:hover:not(:disabled), #qfc-root .qfc-dock:hover { background: #10805a; }
   #qfc-root .qfc-dock[data-phase="paused"] { background: #586c63; border-color: #586c63; }
