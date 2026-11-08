@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.11 — on-demand per-tab runner and safe idle sleep. */
+/* Queued for ChatGPT v1.2.12 — configurable safe sleep and settings backups. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -71,7 +71,11 @@
   let settingsRevision = 0, savedSettingsRevision = 0;
   let notificationWriteLoop = null;
   let notificationSaveStatus = 'Ready';
-  const IDLE_SLEEP_MS = 5 * 60 * 1000;
+  const IDLE_SLEEP_SCALE_MS = 60 * 1000;
+  let autoTurnOffMinutes = C.DEFAULT_AUTO_TURN_OFF_MINUTES;
+  let confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
+  let autoOffRevision = 0, savedAutoOffRevision = 0;
+  let autoOffWriteLoop = null, autoOffSaveStatus = 'Ready';
   let idleTimer = null, lastQueuedInteraction = Date.now();
   let disposing = false, disposed = false, initialized = false;
   let initializationReady = null, runnerPromise = null, terminalEventPromise = null;
@@ -89,14 +93,16 @@
       C.normalize(root?.querySelector('#qfc-workflow-name')?.value));
   }
   function canSleep() {
-    return !disposed && !disposing && !state.running && !runnerPromise &&
-      !state.routeLoading && !uiOperations && !notificationWriteLoop &&
+    return autoTurnOffMinutes > 0 && !disposed && !disposing &&
+      !state.running && !runnerPromise && !state.routeLoading && !uiOperations &&
+      !notificationWriteLoop && !autoOffWriteLoop &&
       !pendingWorkflowLoads.size && !hasUnsavedInput();
   }
   function scheduleIdleSleep() {
     clearIdleTimer();
     if (!canSleep()) return;
-    const delay = Math.max(0, IDLE_SLEEP_MS - (Date.now() - lastQueuedInteraction));
+    const delay = Math.max(0,
+      autoTurnOffMinutes * IDLE_SLEEP_SCALE_MS - (Date.now() - lastQueuedInteraction));
     idleTimer = setTimeout(() => {
       idleTimer = null;
       if (canSleep()) void sleepTab(false);
@@ -106,6 +112,57 @@
     if (disposed || disposing) return;
     lastQueuedInteraction = Date.now();
     scheduleIdleSleep();
+  }
+
+  function renderAutoTurnOffSetting() {
+    const select = root?.querySelector('#qfc-auto-turn-off');
+    if (select) select.value = String(autoTurnOffMinutes);
+    const feedback = root?.querySelector('#qfc-auto-turn-off-status');
+    if (feedback) {
+      feedback.textContent = autoOffSaveStatus;
+      feedback.dataset.state = autoOffSaveStatus.startsWith('Save failed') ? 'error'
+        : autoOffSaveStatus === 'Saved' ? 'saved' : 'neutral';
+    }
+  }
+  async function persistAutoTurnOffMinutes() {
+    if (autoOffWriteLoop) return autoOffWriteLoop;
+    const loop = (async () => {
+      while (savedAutoOffRevision < autoOffRevision) {
+        const revision = autoOffRevision;
+        const snapshot = autoTurnOffMinutes;
+        try {
+          // Preserve legacy and future fields of qfc_v1_settings.
+          const stored = (await STORAGE.get(C.SETTINGS_KEY))[C.SETTINGS_KEY];
+          const previous = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+          await STORAGE.set({ [C.SETTINGS_KEY]: { ...previous, autoTurnOffMinutes: snapshot } });
+          confirmedAutoTurnOffMinutes = snapshot;
+          savedAutoOffRevision = revision;
+        } catch (_) {
+          autoTurnOffMinutes = confirmedAutoTurnOffMinutes;
+          savedAutoOffRevision = autoOffRevision;
+          autoOffSaveStatus = 'Save failed — previous duration restored.';
+          renderAutoTurnOffSetting();
+          return;
+        }
+      }
+      autoOffSaveStatus = 'Saved';
+      renderAutoTurnOffSetting();
+    })();
+    autoOffWriteLoop = loop;
+    try { await loop; }
+    finally {
+      autoOffWriteLoop = null;
+      if (savedAutoOffRevision < autoOffRevision) void persistAutoTurnOffMinutes();
+      else scheduleIdleSleep();
+    }
+  }
+  function saveAutoTurnOffMinutes(value) {
+    if (!C.validAutoTurnOffMinutes(value)) return;
+    autoTurnOffMinutes = value;
+    autoOffRevision++;
+    autoOffSaveStatus = 'Saving…';
+    renderAutoTurnOffSetting();
+    void persistAutoTurnOffMinutes();
   }
 
   // Persist at most one settings record at a time; coalesce rapid changes and
@@ -437,10 +494,10 @@
             <small>Drag here to move · local · lightweight</small>
           </div>
           <div class="qfc-head-actions">
-            <button type="button" class="qfc-small qfc-power" data-action="turn-off" title="Turn off Queued for this ChatGPT tab" aria-label="Turn off Queued for this ChatGPT tab">⏻</button>
-            <button type="button" class="qfc-small" data-action="open-settings" title="Notification settings" aria-label="Notification settings" aria-pressed="false">⚙</button>
+            <button type="button" class="qfc-small qfc-power" data-action="turn-off" title="Close Queued and turn it off in this tab" aria-label="Close Queued and turn it off in this tab">✕</button>
+            <button type="button" class="qfc-small" data-action="open-settings" title="Settings" aria-label="Settings" aria-pressed="false">⚙</button>
             <button type="button" class="qfc-small" data-action="reset-position" title="Reset panel position" aria-label="Reset panel position">⌖</button>
-            <button type="button" class="qfc-small" data-action="toggle" title="Close panel" aria-label="Close panel">✕</button>
+            <button type="button" class="qfc-small qfc-minimize" data-action="toggle" title="Minimize to the Queue dock" aria-label="Minimize Queued to dock">−</button>
           </div>
         </header>
         <nav class="qfc-nav" aria-label="Extension sections">
@@ -497,17 +554,31 @@
           </div>
           <div id="qfc-workflow-items" class="qfc-items" aria-live="polite"></div>
           <div class="qfc-row qfc-backup qfc-wrap">
-            <button type="button" class="qfc-small" data-action="export-workflows">Export workflows</button>
-            <button type="button" class="qfc-small" data-action="import-workflows">Import workflows</button>
+            <button type="button" class="qfc-small" data-action="export-workflows">Export workflows + settings</button>
+            <button type="button" class="qfc-small" data-action="import-workflows">Import workflows + settings</button>
             <button type="button" class="qfc-small" data-action="export-legacy-favorites" title="Backup old Favorites stored before version 1.2">Backup old Favorites</button>
             <input type="file" id="qfc-import-file" accept=".json,application/json" hidden>
           </div>
         </div>
-        <div id="qfc-settings-view" class="qfc-view qfc-settings" aria-label="Notification settings" hidden>
+        <div id="qfc-settings-view" class="qfc-view qfc-settings" aria-label="Queued settings" hidden>
           <div class="qfc-settings-head">
             <button type="button" class="qfc-small" data-action="settings-back" aria-label="Back to previous view">← Back</button>
-            <strong>Notification Settings</strong>
+            <strong>Settings</strong>
           </div>
+          <label class="qfc-label" for="qfc-auto-turn-off">Automatically turn off after</label>
+          <select id="qfc-auto-turn-off" aria-describedby="qfc-auto-turn-off-help">
+            <option value="0">Never (stay on)</option>
+            <option value="1">1 minute</option>
+            <option value="5">5 minutes (default)</option>
+            <option value="10">10 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60">60 minutes</option>
+          </select>
+          <p class="qfc-settings-help" id="qfc-auto-turn-off-help">Time without using Queued. Active runs, unsaved edits and saves prevent automatic turn-off.</p>
+          <p class="qfc-settings-feedback" id="qfc-auto-turn-off-status" role="status" aria-live="polite">Ready</p>
+          <div class="qfc-settings-divider"></div>
+          <strong class="qfc-settings-subtitle">Desktop notifications</strong>
           <label class="qfc-setting-row" for="qfc-notify-enabled">
             <span class="qfc-setting-copy"><strong>Desktop notifications</strong><small>Allow completion and automatic-stop alerts</small></span>
             <span class="qfc-switch-wrap"><span class="qfc-switch-state" id="qfc-notify-enabled-state">ON</span>
@@ -593,6 +664,10 @@
     root.querySelector('#qfc-import-file').addEventListener('change', importFile);
     root.addEventListener('change', event => {
       const target = event.target;
+      if (target.id === 'qfc-auto-turn-off') {
+        saveAutoTurnOffMinutes(Number(target.value));
+        return;
+      }
       if (target.id === 'qfc-notify-duration-mode') {
         if (target.value === 'once' && notificationSettings.soundDuration !== 'once')
           customSecondsDraft = notificationSettings.soundDuration;
@@ -750,6 +825,7 @@
   }
   function renderNotificationSettings() {
     if (!root) return;
+    renderAutoTurnOffSetting();
     const values = notificationSettings;
     const custom = ['soft', 'double', 'alert'].includes(values.sound);
     for (const control of root.querySelectorAll('[data-notification-setting]')) {
@@ -1246,11 +1322,25 @@
           notify('Workflow deleted.');
         }
         break;
-      case 'export-workflows':
-        downloadJson({app: 'Queued for ChatGPT', kind: 'workflows', version: 3,
-          exportedAt: new Date().toISOString(), workflows: state.workflows}, 'queued-for-chatgpt-workflows.json');
-        notify('Workflow backup exported.');
+      case 'export-workflows': {
+        // Read committed values, not pending optimistic UI selections, and obtain
+        // the current workflow revision from the serialized coordinator.
+        if (notificationWriteLoop) await notificationWriteLoop;
+        if (autoOffWriteLoop) await autoOffWriteLoop;
+        const [record, stored] = await Promise.all([
+          rpc('getWorkflows'), STORAGE.get([C.SETTINGS_KEY, C.NOTIFICATION_SETTINGS_KEY])
+        ]);
+        downloadJson({
+          app: 'Queued for ChatGPT', kind: 'workflows', version: 4,
+          exportedAt: new Date().toISOString(), workflows: record.items,
+          settings: {
+            autoTurnOffMinutes: C.cleanAutoTurnOffMinutes(stored[C.SETTINGS_KEY]?.autoTurnOffMinutes),
+            notificationSettings: C.cleanNotificationSettings(stored[C.NOTIFICATION_SETTINGS_KEY])
+          }
+        }, 'queued-for-chatgpt-workflows-and-settings.json');
+        notify('Workflow and settings backup exported.');
         break;
+      }
       case 'export-legacy-favorites': {
         const backup = await rpc('exportLegacyFavorites');
         downloadJson(backup, 'queued-for-chatgpt-old-favorites.json');
@@ -1282,13 +1372,56 @@
   async function importFile(event) {
     const file = event.target.files?.[0]; event.target.value = '';
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { notify('Workflow backup is too large (max 2 MB).'); return; }
+    uiOperations++;
+    queuedInteraction();
     try {
+      if (file.size > 2 * 1024 * 1024) {
+        notify('Workflow backup is too large (max 2 MB).'); return;
+      }
       const data = JSON.parse(await file.text());
+      // Validate settings BEFORE changing any saved workflows. Older v3 workflow
+      // backups have no settings field and leave preferences unchanged.
+      const importedSettings = C.validateBackupSettings(data?.settings);
+      if (importedSettings && !confirm(
+        'Restore the auto turn-off duration and notification preferences from this backup too? This replaces those settings across ChatGPT tabs.')) return;
       const before = state.workflows.length;
       await workflowOp('import', {payload: data});
-      notify(`Imported ${state.workflows.length - before} new workflows.`);
-    } catch (error) { notify(error.message || 'Could not import workflow backup.'); }
+      const added = Math.max(0, state.workflows.length - before);
+      if (!importedSettings) {
+        notify(`Imported ${added} new workflows. Existing settings were kept.`);
+        return;
+      }
+      if (notificationWriteLoop) await notificationWriteLoop;
+      if (autoOffWriteLoop) await autoOffWriteLoop;
+      const existing = (await STORAGE.get(C.SETTINGS_KEY))[C.SETTINGS_KEY];
+      const appSettings = existing && typeof existing === 'object' &&
+        !Array.isArray(existing) ? existing : {};
+      try {
+        await STORAGE.set({
+          [C.SETTINGS_KEY]: {
+            ...appSettings, autoTurnOffMinutes: importedSettings.autoTurnOffMinutes
+          },
+          [C.NOTIFICATION_SETTINGS_KEY]: importedSettings.notificationSettings
+        });
+      } catch (_) {
+        notify(`Imported ${added} workflows, but settings could not be restored. Check storage and retry.`);
+        return;
+      }
+      // The storage listener also updates other tabs. Refresh this tab
+      // explicitly in case a browser mock or existing listener was unavailable.
+      autoTurnOffMinutes = confirmedAutoTurnOffMinutes = importedSettings.autoTurnOffMinutes;
+      notificationSettings = confirmedNotificationSettings = importedSettings.notificationSettings;
+      autoOffSaveStatus = notificationSaveStatus = 'Saved';
+      renderNotificationSettings();
+      scheduleIdleSleep();
+      void rpc('stopSound').catch(() => {});
+      notify(`Imported ${added} new workflows and restored settings.`);
+    } catch (error) {
+      notify(error.message || 'Could not import workflow backup.');
+    } finally {
+      uiOperations--;
+      scheduleIdleSleep();
+    }
   }
 
   // DOM detection is deliberately conservative: never call network endpoints or reuse credentials.
@@ -1717,7 +1850,7 @@
   async function sleepTab(manual) {
     if (disposed || disposing) return false;
     if (manual) {
-      if (uiOperations || pendingWorkflowLoads.size || notificationWriteLoop || state.routeLoading) {
+      if (uiOperations || pendingWorkflowLoads.size || notificationWriteLoop || autoOffWriteLoop || state.routeLoading) {
         notify('Finish the current save or load before turning Queued off.');
         return false;
       }
@@ -1734,6 +1867,7 @@
     if (runnerPromise) await runnerPromise.catch(() => {});
     if (terminalEventPromise) await terminalEventPromise.catch(() => {});
     if (notificationWriteLoop) await notificationWriteLoop.catch(() => {});
+    if (autoOffWriteLoop) await autoOffWriteLoop.catch(() => {});
     for (const timer of transientTimers) clearTimeout(timer);
     transientTimers.clear();
     for (const url of pendingDownloadUrls) URL.revokeObjectURL(url);
@@ -1840,11 +1974,13 @@
     initPanel();
     try {
       const [record, settings] = await Promise.all([
-        rpc('getWorkflows'), STORAGE.get([C.NOTIFICATION_SETTINGS_KEY])
+        rpc('getWorkflows'), STORAGE.get([C.SETTINGS_KEY, C.NOTIFICATION_SETTINGS_KEY])
       ]);
       applyWorkflows(record);
       // Opening is local to an activation, not the obsolete cross-tab open flag.
       state.open = false;
+      autoTurnOffMinutes = C.cleanAutoTurnOffMinutes(settings[C.SETTINGS_KEY]?.autoTurnOffMinutes);
+      confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
       notificationSettings = C.cleanNotificationSettings(settings[C.NOTIFICATION_SETTINGS_KEY]);
       confirmedNotificationSettings = notificationSettings;
       if (notificationSettings.soundDuration !== 'once') customSecondsDraft = notificationSettings.soundDuration;
@@ -1856,6 +1992,14 @@
     observePage();
     const onStorageChanged = (changes, area) => {
       if (disposed || disposing || area !== 'local') return;
+      if (changes[C.SETTINGS_KEY] && !autoOffWriteLoop &&
+          autoOffRevision === savedAutoOffRevision) {
+        autoTurnOffMinutes = C.cleanAutoTurnOffMinutes(changes[C.SETTINGS_KEY].newValue?.autoTurnOffMinutes);
+        confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
+        autoOffSaveStatus = 'Saved';
+        renderAutoTurnOffSetting();
+        scheduleIdleSleep();
+      }
       if (changes[C.NOTIFICATION_SETTINGS_KEY] && !notificationWriteLoop &&
           settingsRevision === savedSettingsRevision) {
         notificationSettings = C.cleanNotificationSettings(changes[C.NOTIFICATION_SETTINGS_KEY].newValue);

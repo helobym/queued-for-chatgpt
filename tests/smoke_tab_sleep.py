@@ -7,7 +7,7 @@ MOCK = (ROOT / "tests/mock_chat.html").read_text(encoding="utf-8").replace(
     "}, 350);", "}, 1600);"
 )
 SOURCE = (ROOT / "content.js").read_text(encoding="utf-8").replace(
-    "const IDLE_SLEEP_MS = 5 * 60 * 1000;", "const IDLE_SLEEP_MS = 800;"
+    "const IDLE_SLEEP_SCALE_MS = 60 * 1000;", "const IDLE_SLEEP_SCALE_MS = 160;"
 )
 
 with sync_playwright() as playwright:
@@ -141,5 +141,19 @@ with sync_playwright() as playwright:
     assert record["items"][0]["status"] in ("pending", "sending", "awaiting")
     assert not any("completed successfully" in n["options"]["title"]
                    for n in page.evaluate("window.__notices"))
+
+    # Never disables the timer; selecting one minute re-arms it immediately.
+    activate()
+    page.locator('[data-action="open-settings"]').click()
+    page.locator("#qfc-auto-turn-off").select_option("0")
+    page.wait_for_function("""async()=>{
+      const s=(await chrome.storage.local.get('qfc_v1_settings')).qfc_v1_settings;
+      return s?.autoTurnOffMinutes===0;
+    }""")
+    page.wait_for_timeout(950)
+    assert page.locator("#qfc-root").count() == 1
+    page.locator("#qfc-auto-turn-off").select_option("1")
+    page.wait_for_function("!document.querySelector('#qfc-root')",timeout=12000)
+
     browser.close()
-    print("PASS: v1.2.11 idle sleep, reactivation, manual pause and persisted settings")
+    print("PASS: configurable idle sleep, Never, reactivation, manual pause and persisted settings")

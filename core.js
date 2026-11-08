@@ -8,6 +8,15 @@
   const FAV_KEY = 'qfc_v2_favorites';
   const SETTINGS_KEY = 'qfc_v1_settings';
   const NOTIFICATION_SETTINGS_KEY = 'qfc_v1_notification_settings';
+  const DEFAULT_AUTO_TURN_OFF_MINUTES = 5;
+  // Zero explicitly disables automatic sleep; 5 minutes preserves v1.2.11 behavior.
+  const AUTO_TURN_OFF_OPTIONS = Object.freeze([0, 1, 5, 10, 15, 30, 60]);
+  function validAutoTurnOffMinutes(value) {
+    return AUTO_TURN_OFF_OPTIONS.includes(value);
+  }
+  function cleanAutoTurnOffMinutes(value) {
+    return validAutoTurnOffMinutes(value) ? value : DEFAULT_AUTO_TURN_OFF_MINUTES;
+  }
   const DEFAULT_NOTIFICATION_SETTINGS = Object.freeze({
     enabled: true, onSuccess: true, onInterrupted: true,
     sound: 'system', soundDuration: 'once', soundVolume: 75, visibility: 'system'
@@ -30,6 +39,24 @@
       soundVolume: validSoundVolume(value.soundVolume) ? value.soundVolume : defaults.soundVolume,
       visibility: ['system', 'persistent'].includes(value.visibility) ? value.visibility : defaults.visibility
     };
+  }
+  // New v4 workflow backups include the selected idle timeout and all notification
+  // preferences. Existing v3 (workflow-only) backups remain importable.
+  function validateBackupSettings(settings) {
+    if (settings === undefined) return null;
+    if (!settings || typeof settings !== 'object' || Array.isArray(settings) ||
+        !validAutoTurnOffMinutes(settings.autoTurnOffMinutes) ||
+        !settings.notificationSettings || typeof settings.notificationSettings !== 'object' ||
+        Array.isArray(settings.notificationSettings))
+      throw new Error('Invalid settings in workflow backup.');
+    const source = settings.notificationSettings;
+    const cleaned = cleanNotificationSettings(source);
+    for (const key of Object.keys(DEFAULT_NOTIFICATION_SETTINGS)) {
+      if (!Object.hasOwn(source, key) || source[key] !== cleaned[key])
+        throw new Error('Invalid notification settings in workflow backup.');
+    }
+    return { autoTurnOffMinutes: settings.autoTurnOffMinutes,
+      notificationSettings: cleaned };
   }
   const WORKFLOWS_KEY = 'qfc_v3_workflows';
   const MAX_WORKFLOWS = 200;
@@ -196,6 +223,8 @@
   }
   const api = { VERSION, MAX_PROMPT_LENGTH, MAX_FAVORITES, MAX_QUEUE, FAV_KEY, SETTINGS_KEY,
     NOTIFICATION_SETTINGS_KEY, DEFAULT_NOTIFICATION_SETTINGS, cleanNotificationSettings,
+    DEFAULT_AUTO_TURN_OFF_MINUTES, AUTO_TURN_OFF_OPTIONS, validAutoTurnOffMinutes,
+    cleanAutoTurnOffMinutes, validateBackupSettings,
     validSoundDuration, validSoundVolume,
     WORKFLOWS_KEY, MAX_WORKFLOWS, MAX_WORKFLOW_CHARS, MAX_WORKFLOWS_TOTAL_CHARS, MAX_ACTIVITY_PREVIEW,
     validWorkflowName, cleanWorkflowSteps, cleanWorkflows, cleanWorkflowOrigin, cleanLastCompleted,

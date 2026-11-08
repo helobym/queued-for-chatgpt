@@ -107,3 +107,41 @@ test('custom durations and volume are bounded and legacy values remain valid', (
     assert.equal(core.cleanNotificationSettings({soundVolume:volume}).soundVolume,75);
   }
 });
+
+
+test('auto turn-off duration has safe defaults and supports Never', () => {
+  assert.equal(core.SETTINGS_KEY, 'qfc_v1_settings');
+  assert.equal(core.DEFAULT_AUTO_TURN_OFF_MINUTES, 5);
+  assert.equal(core.cleanAutoTurnOffMinutes(undefined), 5);
+  assert.equal(core.cleanAutoTurnOffMinutes(0), 0);
+  assert.equal(core.cleanAutoTurnOffMinutes(1), 1);
+  assert.equal(core.cleanAutoTurnOffMinutes(60), 60);
+  for (const invalid of [-1, 2, 61, '5', null, {}, 1.5]) {
+    assert.equal(core.validAutoTurnOffMinutes(invalid), false);
+    assert.equal(core.cleanAutoTurnOffMinutes(invalid), 5);
+  }
+});
+
+test('v4 workflow backup settings validate strictly without losing notification opt-outs', () => {
+  assert.equal(core.validateBackupSettings(undefined), null);
+  const backup = {
+    autoTurnOffMinutes: 0,
+    notificationSettings: {
+      enabled: false, onSuccess: false, onInterrupted: false,
+      sound: 'alert', soundDuration: '20', soundVolume: 35,
+      visibility: 'persistent'
+    }
+  };
+  assert.deepEqual(core.validateBackupSettings(backup), backup);
+  assert.deepEqual(core.validateBackupSettings({...backup, autoTurnOffMinutes: 15}),
+    {...backup, autoTurnOffMinutes: 15});
+  assert.throws(() => core.validateBackupSettings({...backup, autoTurnOffMinutes: '0'}), /Invalid settings/);
+  assert.throws(() => core.validateBackupSettings({...backup, autoTurnOffMinutes: 120}), /Invalid settings/);
+  assert.throws(() => core.validateBackupSettings({
+    ...backup, notificationSettings: {...backup.notificationSettings, enabled: 'false'}
+  }), /Invalid notification settings/);
+  assert.throws(() => core.validateBackupSettings({
+    ...backup, notificationSettings: { enabled: true }
+  }), /Invalid notification settings/);
+  assert.throws(() => core.validateBackupSettings(null), /Invalid settings/);
+});

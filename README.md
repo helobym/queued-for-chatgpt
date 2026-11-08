@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.11 — Per-tab Activation and Safe Idle Sleep
+# Queued for ChatGPT v1.2.12 — Configurable Sleep and Complete Settings Backups
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.11](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.11)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.12](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.12)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.12:** Set **Automatic turn-off** in ⚙ Settings to Never, 1, 5, 10, 15, 30 or 60 minutes (default 5). The header **−** minimizes to the live Queue dock, while **✕** closes Queued and turns it off in that tab. **Export workflows + settings** now includes your duration and all desktop notification preferences in a version 4 JSON backup; importing confirms before replacing settings. Older workflow-only backups remain compatible.
 
 **New in v1.2.11:** Queued loads only when you click the Chrome toolbar icon or press **Alt+Shift+Q**. Its compact **⏻** control disables only that ChatGPT tab. Five minutes of inactivity puts an idle tab to sleep, releasing its UI and observer without deleting prompts or workflows. An authoritative queue-end refresh improves the cross-tab Load boundary, and expanded workflow scrolling flows into the outer list. The conservative send/response safeguards remain unchanged.
 
@@ -30,13 +32,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.11 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.11), expand **Assets**, and download **`queued-for-chatgpt-v1.2.11.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.12 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.12), expand **Assets**, and download **`queued-for-chatgpt-v1.2.12.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.11**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.12**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Click the **Queued for ChatGPT** toolbar icon or press **Alt+Shift+Q**. The floating Queued panel opens in that tab only. Pin the extension in Chrome's toolbar for easier access.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -150,22 +152,31 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.11.zip`** from the [v1.2.10 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.10) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.12.zip`** from the [v1.2.12 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.12) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs. Queued will remain asleep until you use its toolbar icon or Alt+Shift+Q in each tab.
 
 Changing the extension's ID (for example, by installing from a different folder) can make your old locally stored queues and workflows inaccessible to the new copy. Export backups before upgrading, and check uncertain sends manually to avoid duplicates.
 
-## Turn Queued off in a single tab (v1.2.11)
+## Minimize, turn off and customize idle sleep
 
-The full content script is **not** automatically injected on ChatGPT visits. Use the Chrome toolbar icon or **Alt+Shift+Q** to activate Queued in the selected ChatGPT tab. The first activation opens the window without starting any prompts. Once loaded, the existing compact dock can open and close the panel.
+Queued is injected only when you activate it with the Chrome toolbar icon or **Alt+Shift+Q**. This opens the floating window without sending prompts. Once activated, you can reopen the panel from the compact live-status Queue dock.
 
-Inside the panel header, press **⏻ Turn off Queued for this ChatGPT tab** to disconnect its page observer and remove its UI. Other ChatGPT tabs and any queue running there are unaffected. If a queue is running, Queued asks before pausing it; uncertain sends are retained for manual review. Unsaved edits require confirmation. Tab activation is temporary, not a setting shared across tabs.
+- **− Minimize** hides the window but keeps the dock and active Queued session available. It does not pause or stop a running queue.
+- **✕ Close / turn off** disconnects Queued's UI and page observer in the current tab. Reopen from the toolbar or shortcut. If a queue is running or you have unsaved changes, Queued asks for confirmation. It never affects another ChatGPT tab.
 
-An idle, inactive Queued session automatically sleeps after approximately **five minutes without interacting with Queued**. Active runs, unsaved edits and unfinished storage operations prevent automatic sleep. Normal manual ChatGPT typing never wakes Queued or starts a saved queue. After sleeping, press **Alt+Shift+Q** or the toolbar icon to reopen; you must explicitly press Start to run pending prompts.
+Open **⚙ Settings → Automatically turn off after** to choose **Never**, **1**, **5**, **10**, **15**, **30** or **60 minutes**. Five minutes is the default for existing installations; Never disables automatic sleep. The timer measures time since you last interacted with Queued, not manual ChatGPT activity. Active runs, unsaved drafts and unfinished storage writes prevent automatic turn-off. The duration is saved in local settings and applies to newly activated tabs; changing it also updates any currently active tabs.
 
-Chrome manages the exact moment unused JavaScript memory is reclaimed. Idle resource savings are a goal, not a guaranteed per-tab RAM number. Activation requires Chrome's `activeTab` and `scripting` permissions; Queued does not ask for general browsing access.
+After automatic sleep, Queued can be reopened with **Alt+Shift+Q** or the toolbar icon. Stored queue items and workflows are not deleted, and the extension does not automatically send them. Chrome controls actual JavaScript memory reclamation; RAM savings are not guaranteed.
+
+## JSON workflow and settings backups
+
+Choose **Workflows → Export workflows + settings** to download a version 4 JSON backup. It contains all Saved Queue Workflows, the selected automatic turn-off duration, and notification settings (enabled switches, sound, volume, duration and visibility). It does **not** include per-chat pending queues, previous prompt activity, or active execution state. Backup files may contain full workflow prompts; store them securely.
+
+Use **Import workflows + settings** to merge workflows by name. If the backup includes settings, a confirmation asks before replacing your existing shared preferences. Canceling the confirmation leaves the import unchanged. A legacy **version 3 workflow-only** JSON file still imports normally and never overwrites your current settings. Invalid settings are rejected before the workflow import. If saving settings fails after workflows were imported, the extension reports that partial outcome.
+
+Export important workflows before an in-place update. To preserve your existing browser queues and settings, keep the **same installed extension folder and extension ID**.
 
 ## How to use Load Workflow
 
@@ -204,9 +215,9 @@ On **Workflows**, each saved workflow starts collapsed. Click **Expand** to see 
 
 On **Queue**, **Copy** remains available for pending, sending or awaiting-response prompts. All Copy actions preserve full text and line breaks, show brief success/failure feedback, and never send, edit, pause, or remove prompts. Clipboard contents may be accessible to other applications on the device.
 
-## Notification Settings and custom sound
+## Settings and notification sounds
 
-Open the floating **☷ Queue** panel and click **⚙ Notification settings**. The Desktop notifications, Workflow completed and Stopped automatically switches show ON/OFF states and a small Saved/Save failed indicator. Choose System Default or Silent, or select a locally generated Soft Chime, Double Chime or Alert Beep. For a custom sound, choose **Play once** or **Custom duration** (a whole number from **1–60 seconds**) and adjust **Custom sound volume** from **0–100%**. **Test sound (2s)** requests a brief audio preview and **Test notification** requests a separate silent desktop notification. The test actions do not send prompts or create workflow completion records.
+Open the floating **☷ Queue** panel and click **⚙ Settings**. Below the automatic turn-off selector, the desktop notification controls remain unchanged. The Desktop notifications, Workflow completed and Stopped automatically switches show ON/OFF states and a small Saved/Save failed indicator. Choose System Default or Silent, or select a locally generated Soft Chime, Double Chime or Alert Beep. For a custom sound, choose **Play once** or **Custom duration** (a whole number from **1–60 seconds**) and adjust **Custom sound volume** from **0–100%**. **Test sound (2s)** requests a brief audio preview and **Test notification** requests a separate silent desktop notification. The test actions do not send prompts or create workflow completion records.
 
 **Until dismissed** requests a persistent Chrome notification where supported; Chrome/OS may still dismiss it. **Sound duration is not popup duration**, and OS sound/Focus/Do Not Disturb or browser restrictions can suppress audio or notifications entirely. Custom audio uses the `offscreen` permission, opens an audio-only extension context only as needed, and runs a bounded timer there. No ringtone files are downloaded; no text from prompts or AI responses is included in sound instructions.
 
@@ -225,7 +236,7 @@ The extension uses the **notifications** permission alongside its existing **sto
 ## Existing features retained
 
 - New-chat first prompt, sequential auto-send, pause/resume, edit/remove/reorder, conservative receipt/completion checks, safe manual recovery.
-- Shared workflow library across browser tabs and windows: save pending queue as workflow, create/edit/reorder/delete workflows, JSON import/export.
+- Shared workflow library across browser tabs and windows: save pending queue as workflow, create/edit/reorder/delete workflows, JSON backup/import of workflows and preferences.
 - Live-status floating dock, draggable panel, position reset, per-tab position persistence, expandable workflows and one current/previous prompt activity strip.
 - Old Favorites data remains in legacy storage for separate backup, but the old star/Favorites UI stays removed.
 - Manifest V3, vanilla JS, on-demand tab injection, local-only storage, no API key, no telemetry or external backend.
@@ -249,7 +260,9 @@ Playwright (installed Chromium, simulated page):
 - `tests/smoke_workflow_load_during_run.py` — Load while idle does not send; Load while running appends after existing prompts and the active runner processes the new steps.
 - `tests/smoke_workflow_new_chat.py` — directly start workflow on New Chat and verify the first prompt is counted exactly once in the completion alert.
 - `tests/smoke_notifications.py` — verified completion, automatic send-stop notification, manual Pause silence and notification-click behavior.
-- `tests/smoke_v129_settings.py` — Settings switches, bounded duration/volume, save failure rollback, cross-tab updates, audio preview and disabled alerts.
+- `tests/smoke_v129_settings.py` — notification switches, bounded sound duration/volume, save failure rollback, cross-tab updates, audio preview and disabled alerts.
+- `tests/smoke_settings_backup.py` — minimize/close icons, auto-off duration, JSON v4 settings backup, legacy v3 import and invalid-settings rejection.
+- `tests/smoke_tab_sleep.py` — on-demand sleep and reactivation, Never/one-minute duration, safe manual stop and persisted settings.
 - `tests/offscreen_audio.test.js` — bounded generated tone scheduling, replacement, rejection of malformed messages and automatic cleanup.
 - `tests/notifications.test.js` — worker deduplication, session recovery, tab discard, missing permissions and malicious/stale event rejection.
 - `tests/smoke_project_workflows.py` — Project Load/Start, first-send migration, cross-Project isolation and reload persistence.

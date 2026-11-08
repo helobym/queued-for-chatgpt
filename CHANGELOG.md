@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.12 (2026-11-08)
+
+- Added an auto-turn-off duration selector under Settings: Never, 1, 5, 10, 15, 30 or 60 minutes; existing users keep the five-minute default.
+- Persisted the shared duration in the existing `qfc_v1_settings` record with coalesced saves, rollback on failure, and per-tab timer refresh.
+- Replaced the window's former × minimize button with −, and changed the former power icon into an accessible × Close/turn-off control.
+- Upgraded workflow JSON export to version 4 with auto-turn-off and notification settings; imported settings require confirmation and strict validation, while version 3 workflow-only backups remain compatible.
+- Added simulated-browser coverage of complete backup restore, invalid settings, duration save rollback, Never, and the new header behavior.
+- Retained all sender locks, conservative receipt/reply completion safeguards, saved queues, existing notification behavior, and lightweight on-demand injection.
+
+
 ## 1.2.11 (2026-11-08)
 
 - Switched to on-demand per-tab activation via the Chrome toolbar and Alt+Shift+Q rather than injecting the full content script into every ChatGPT tab.

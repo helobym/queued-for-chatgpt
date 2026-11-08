@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Queued for ChatGPT",
   "short_name": "Queued for ChatGPT",
-  "version": "1.2.11",
-  "description": "Lightweight, on-demand per-tab ChatGPT queues and workflows with safe idle sleep and notifications.",
+  "version": "1.2.12",
+  "description": "Lightweight on-demand ChatGPT queues with configurable safe idle sleep, workflows and settings backups.",
   "permissions": [
     "storage",
     "notifications",
