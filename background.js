@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.11 — on-demand per-tab activation and safe notifications. */
+/* Queued for ChatGPT v1.2.14 — on-demand activation, safe reactivation and notifications. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;
@@ -264,6 +264,30 @@ function allowedSender(sender) {
 }
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!allowedSender(sender) || !message || message.app !== 'qfc-v1.1') return false;
+  if (message.command === 'tabClosing' || message.command === 'tabClosed') {
+    const tabId = sender.tab?.id;
+    if (!Number.isSafeInteger(tabId) || tabId < 0) return false;
+    if (message.command === 'tabClosing') {
+      // A shortcut requested during shutdown is deferred until the previous
+      // content instance has removed its listeners, DOM and injection guard.
+      const previous = closingTabs.get(tabId);
+      closingTabs.set(tabId, { reopen: previous?.reopen === true });
+      sendResponse({ ok: true, data: { closing: true } });
+    } else {
+      const pending = closingTabs.get(tabId);
+      closingTabs.delete(tabId);
+      sendResponse({ ok: true, data: { closed: true } });
+      if (pending?.reopen) {
+        void (async () => {
+          try {
+            const tab = await chrome.tabs.get(tabId);
+            if (isChatGPTTab(tab?.url)) await requestTabOpening(tab);
+          } catch (_) { /* The tab may have navigated or closed. */ }
+        })();
+      }
+    }
+    return false;
+  }
   if (message.command === 'tabSleep') {
     const tabId = sender.tab?.id;
     if (!Number.isSafeInteger(tabId)) return false;
@@ -280,6 +304,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   serialized(async () => {
     if (message.command === 'runLifecycle') return runLifecycle(message, sender);
+    if (message.command === 'getShortcut') {
+      if (!chrome.commands?.getAll) return { supported: false, shortcut: '' };
+      const commands = await chrome.commands.getAll();
+      const assigned = commands.find(item => item.name === 'toggle-queue-panel');
+      return { supported: Boolean(assigned), shortcut: typeof assigned?.shortcut === 'string' ? assigned.shortcut : '' };
+    }
+    if (message.command === 'openShortcutSettings') {
+      await chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+      return { opened: true };
+    }
     if (message.command === 'notificationPermission')
       return chrome.notifications?.getPermissionLevel
         ? chrome.notifications.getPermissionLevel() : 'unavailable';
@@ -307,6 +341,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // No permanent page script, tab polling or resident wake listener.
 // Chrome grants activeTab only on a user toolbar/shortcut invocation.
+const closingTabs = new Map(); // Transient per-tab shutdown and deferred shortcut state.
 const tabTasks = new Map();
 function sequenceTab(tabId, task) {
   const prior = tabTasks.get(tabId) || Promise.resolve();
@@ -333,10 +368,20 @@ async function openOrToggleTab(tab) {
     let target = tab;
     if (!target.url && chrome.tabs.get) target = await chrome.tabs.get(tab.id);
     if (!isChatGPTTab(target?.url)) return;
-    let active = false;
-    try { active = (await sendUi(tab.id, 'status'))?.active === true; }
+    if (closingTabs.has(tab.id)) {
+      closingTabs.get(tab.id).reopen = true;
+      return;
+    }
+    let status = null;
+    try { status = await sendUi(tab.id, 'status'); }
     catch (_) { /* A sleeping tab has no message receiver. */ }
-    if (active) {
+    if (status?.closing) {
+      const closing = closingTabs.get(tab.id) || { reopen: false };
+      closing.reopen = true;
+      closingTabs.set(tab.id, closing);
+      return;
+    }
+    if (status?.active) {
       await sendUi(tab.id, 'toggle-panel');
       return;
     }
@@ -379,6 +424,7 @@ chrome.action?.onClicked?.addListener(requestTabOpening);
 // and clean abandoned records only when navigation completes.
 chrome.tabs?.onUpdated?.addListener((tabId, changeInfo) => {
   if (changeInfo.discarded === true) {
+    closingTabs.delete(tabId);
     void serialized(async () => {
       const run = await getRun(tabId);
       if (!run) return;
@@ -388,12 +434,14 @@ chrome.tabs?.onUpdated?.addListener((tabId, changeInfo) => {
   } else if (changeInfo.status === 'complete' ||
              (typeof changeInfo.url === 'string' &&
               !/^https:\/\/chatgpt\.com(?:\/|$)/.test(changeInfo.url))) {
+    closingTabs.delete(tabId);
     // A full navigation/reload ended the old content-script run. A New Chat
     // SPA route handoff does not trigger this cleanup.
     void serialized(() => storeRun(tabId, null)).catch(() => {});
   }
 });
 chrome.tabs?.onRemoved?.addListener(tabId => {
+  closingTabs.delete(tabId);
   // Closing a tab is user-controlled; do not generate a false success/error.
   void serialized(() => storeRun(tabId, null)).catch(() => {});
 });

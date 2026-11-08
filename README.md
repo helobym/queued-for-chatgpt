@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.13 — Consistent Window Controls
+# Queued for ChatGPT v1.2.14 — Reliable Hotkey and Idle-Only Sleep
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.13](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.14](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.14)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.14:** ⚙ Settings shows the shortcut actually assigned by Chrome, including an unassigned warning and Refresh / Change in Chrome controls. A shortcut pressed during shutdown safely reopens Queued after full cleanup. Auto-turn-off counts only eligible idle time, starting a fresh countdown after a running workflow finishes; uncertain prompts stay available for review. The workflow backup format and Chrome-managed key assignment remain unchanged.
 
 **New in v1.2.13:** The ✕ close/turn-off button now appears immediately **to the right of − minimize** in the floating header. Both controls use matching neutral backgrounds, text colors, font size, and bold weight (including dark mode); behavior remains unchanged.
 
@@ -34,14 +36,14 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.13 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13), expand **Assets**, and download **`queued-for-chatgpt-v1.2.13.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.14 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13), expand **Assets**, and download **`queued-for-chatgpt-v1.2.14.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
 7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.13**.
-8. Open or refresh [ChatGPT](https://chatgpt.com/). Click the **Queued for ChatGPT** toolbar icon or press **Alt+Shift+Q**. The floating Queued panel opens in that tab only. Pin the extension in Chrome's toolbar for easier access.
+8. Open or refresh [ChatGPT](https://chatgpt.com/). Click the **Queued for ChatGPT** toolbar icon or press the currently assigned shortcut (suggested **Alt+Shift+Q**). If the hotkey does nothing, open ⚙ Settings → Keyboard shortcut or `chrome://extensions/shortcuts` to check its assignment. Pin the extension in Chrome's toolbar for easier access.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
 
@@ -154,7 +156,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.13.zip`** from the [v1.2.13 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.14.zip`** from the [v1.2.14 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs. Queued will remain asleep until you use its toolbar icon or Alt+Shift+Q in each tab.
@@ -168,13 +170,13 @@ Queued is injected only when you activate it with the Chrome toolbar icon or **A
 - **− Minimize** hides the window but keeps the dock and active Queued session available. It does not pause or stop a running queue.
 - **✕ Close / turn off** is directly to the right of − and matches its neutral button styling. It disconnects Queued's UI and page observer in the current tab. Reopen from the toolbar or shortcut. If a queue is running or you have unsaved changes, Queued asks for confirmation. It never affects another ChatGPT tab.
 
-Open **⚙ Settings → Automatically turn off after** to choose **Never**, **1**, **5**, **10**, **15**, **30** or **60 minutes**. Five minutes is the default for existing installations; Never disables automatic sleep. The timer measures time since you last interacted with Queued, not manual ChatGPT activity. Active runs, unsaved drafts and unfinished storage writes prevent automatic turn-off. The duration is saved in local settings and applies to newly activated tabs; changing it also updates any currently active tabs.
+Open **⚙ Settings → Automatically turn off after (idle only)** to choose **Never**, **1**, **5**, **10**, **15**, **30** or **60 minutes**. Five minutes is the default; Never disables automatic sleep. The full countdown begins when Queued becomes safely idle, including after a workflow finishes and releases its sender lock. Active runs, uncertain sending/awaiting prompts, unsaved drafts and unfinished storage operations prevent automatic sleep. The duration is saved in local settings and shared across active ChatGPT tabs.
 
 After automatic sleep, Queued can be reopened with **Alt+Shift+Q** or the toolbar icon. Stored queue items and workflows are not deleted, and the extension does not automatically send them. Chrome controls actual JavaScript memory reclamation; RAM savings are not guaranteed.
 
 ## JSON workflow and settings backups
 
-Choose **Workflows → Export workflows + settings** to download a version 4 JSON backup. It contains all Saved Queue Workflows, the selected automatic turn-off duration, and notification settings (enabled switches, sound, volume, duration and visibility). It does **not** include per-chat pending queues, previous prompt activity, or active execution state. Backup files may contain full workflow prompts; store them securely.
+Choose **Workflows → Export workflows + settings** to download a version 4 JSON backup. It contains all Saved Queue Workflows, the selected automatic turn-off duration, and notification settings (enabled switches, sound, volume, duration and visibility). It does **not** include per-chat pending queues, previous prompt activity, active execution state, or Chrome-managed keyboard shortcut assignments. Backup files may contain full workflow prompts; store them securely.
 
 Use **Import workflows + settings** to merge workflows by name. If the backup includes settings, a confirmation asks before replacing your existing shared preferences. Canceling the confirmation leaves the import unchanged. A legacy **version 3 workflow-only** JSON file still imports normally and never overwrites your current settings. Invalid settings are rejected before the workflow import. If saving settings fails after workflows were imported, the extension reports that partial outcome.
 
@@ -209,7 +211,7 @@ For example, with prompt **#1 running** and prompt **#2 pending**, loading a two
 
 After activation, the floating **☷ Queue** button shows the active conversation's live status even when the panel is closed. When running, **N left** means N prompts are still pending *after* the active prompt. A final active prompt shows **Running · 0 left** until completion. A queue that is pending but not running shows **Paused · N pending**. **Check status** means an in-flight prompt may be handled in another tab or requires manual review; do not assume it is safe to retry. **Starting** means a sender lock has not yet been confirmed.
 
-Press **Alt+Shift+Q** to activate and open a sleeping tab, or toggle the panel while Queued is active. The shortcut is provided by Chrome's Commands API, so it can be changed at `chrome://extensions/shortcuts`. The shortcut never starts a queue.
+Press the **Chrome-assigned shortcut** (suggested: **Alt+Shift+Q**) to activate and open a sleeping/closed ChatGPT tab, minimize the expanded panel, or restore it from the dock. Check the actual binding under ⚙ Settings → Keyboard shortcut, or reassign it at `chrome://extensions/shortcuts`. The shortcut never starts or stops a queue.
 
 **Recent Activity** remains a small heading until you choose **Expand**. It then shows Current and Previous previews with workflow name and step information. Click **Collapse** to hide details; closing/reopening the panel or switching Queue/Workflows leaves the disclosure state intact until the page reloads.
 

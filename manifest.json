@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Queued for ChatGPT",
   "short_name": "Queued for ChatGPT",
-  "version": "1.2.13",
+  "version": "1.2.14",
   "description": "Lightweight on-demand ChatGPT queues with configurable safe idle sleep, workflows and settings backups.",
   "permissions": [
     "storage",
@@ -24,7 +24,7 @@
       "suggested_key": {
         "default": "Alt+Shift+Q"
       },
-      "description": "Open or close the Queued for ChatGPT panel"
+      "description": "Minimize, restore or reopen Queued for ChatGPT"
     }
   },
   "action": {

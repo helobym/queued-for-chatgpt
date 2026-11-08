@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.14 (2026-11-08)
+
+- Added a readout of Chrome's assigned shortcut, an unassigned warning, Refresh and Change in Chrome controls in Settings.
+- Deferred shortcut-triggered reopening until per-tab shutdown completes, preventing injection against a closing content script.
+- Counted eligible idle time only; running workflows get a fresh timeout after finishing and releasing their sender lock.
+- Preserved uncertain sending/awaiting prompts for review instead of treating them as ordinary idle.
+- Kept Chrome-managed keyboard bindings and v4 workflow JSON backup compatibility; no new permissions or polling.
+- Expanded worker and Chromium tests, installation documentation, and release packaging.
+
+
 ## 1.2.13 (2026-11-08)
 
 - Moved the ✕ close/turn-off control immediately after the − minimize control at the far right of the floating window header.

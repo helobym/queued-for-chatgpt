@@ -7,14 +7,16 @@ const path = require('node:path');
 const base = path.resolve(__dirname, '..');
 function createWorker(stored = {}) {
   let listener, commandListener, actionListener, rejectSend = false;
-  const sent = [], injected = [], css = [];
+  let shortcut = 'Alt+Shift+Q';
+  const sent = [], injected = [], css = [], openedTabs = [];
   const activeTabs = new Set();
   const db = JSON.parse(JSON.stringify(stored));
   const ext = { id: 'test-extension' };
   const context = vm.createContext({
     URL, Date, Promise, Math, Set, console, crypto: require('node:crypto').webcrypto,
     chrome: {
-      commands: { onCommand: { addListener(fn) { commandListener = fn; } } },
+      commands: { onCommand: { addListener(fn) { commandListener = fn; } },
+        async getAll() { return [{ name: 'toggle-queue-panel', shortcut }]; } },
       action: { onClicked: { addListener(fn) { actionListener = fn; } } },
       scripting: {
         async insertCSS(opts) { css.push(['insert',opts.target.tabId]); },
@@ -22,6 +24,7 @@ function createWorker(stored = {}) {
         async executeScript(opts) { injected.push([opts.target.tabId,...opts.files]); }
       },
       tabs: {
+        async create(options) { openedTabs.push(options); return { id: 100 + openedTabs.length, ...options }; },
         async query() { return [{id:42,url:'https://chatgpt.com/c/mychat'}]; },
         async get(id) { return {id,url:'https://chatgpt.com/c/mychat'}; },
         async sendMessage(id, message) {
@@ -44,13 +47,15 @@ function createWorker(stored = {}) {
   });
   context.importScripts = (...paths) => paths.forEach(file => vm.runInContext(fs.readFileSync(path.join(base, file), 'utf8'), context, { filename: file }));
   vm.runInContext(fs.readFileSync(path.join(base, 'background.js'), 'utf8'), context, { filename: 'background.js' });
-  return { db, sent, injected, css,
+  return { db, sent, injected, css, openedTabs,
+    setShortcut(value) { shortcut = value; },
+    closeTab(id) { activeTabs.delete(id); },
     command(command, tab) { return commandListener(command, tab); },
     action(tab) { return actionListener(tab); },
     rejectReceiver() { rejectSend = true; },
     message(payload) {
     return new Promise(resolve => {
-      const allowed = listener({ app: 'qfc-v1.1', ...payload }, { id: ext.id, frameId: 0, url: 'https://chatgpt.com/c/mychat' }, resolve);
+      const allowed = listener({ app: 'qfc-v1.1', ...payload }, { id: ext.id, frameId: 0, url: 'https://chatgpt.com/c/mychat', tab: { id: 42 } }, resolve);
       if (!allowed) resolve({ ok: false, error: 'blocked' });
     });
   }, forbidden(payload) {
@@ -141,4 +146,31 @@ test('toolbar and shortcut wake only the selected ChatGPT tab and toggle existin
   bg.rejectReceiver();
   await assert.doesNotReject(bg.command('toggle-queue-panel',{id:9,url:'https://chatgpt.com/c/one'}));
   assert.deepEqual(bg.css.at(-1),['remove',9]);
+});
+
+test('shortcut settings report the actual Chrome assignment and open its manager', async () => {
+  const bg = createWorker();
+  assert.deepEqual(JSON.parse(JSON.stringify((await bg.message({command:'getShortcut'})).data)),
+    {supported:true,shortcut:'Alt+Shift+Q'});
+  bg.setShortcut('');
+  assert.equal((await bg.message({command:'getShortcut'})).data.shortcut, '');
+  bg.setShortcut('Ctrl+Shift+Y');
+  assert.equal((await bg.message({command:'getShortcut'})).data.shortcut, 'Ctrl+Shift+Y');
+  const opened = await bg.message({command:'openShortcutSettings'});
+  assert.equal(opened.ok, true);
+  assert.deepEqual(bg.openedTabs[0], {url:'chrome://extensions/shortcuts'});
+});
+test('hotkey pressed during close defers exactly one reopen until content has disposed', async () => {
+  const bg = createWorker();
+  await bg.command('toggle-queue-panel', {id:42,url:'https://chatgpt.com/c/mychat'});
+  assert.equal(bg.injected.length, 1);
+  bg.closeTab(42);
+  await bg.message({command:'tabClosing'});
+  await bg.command('toggle-queue-panel', {id:42,url:'https://chatgpt.com/c/mychat'});
+  await bg.command('toggle-queue-panel', {id:42,url:'https://chatgpt.com/c/mychat'});
+  assert.equal(bg.injected.length, 1, 'no injection until old instance has been removed');
+  await bg.message({command:'tabClosed'});
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(bg.injected.length, 2, 'one deferred reopen for repeated shortcut requests');
+  assert.equal(bg.sent.at(-1).message.action, 'open-panel');
 });

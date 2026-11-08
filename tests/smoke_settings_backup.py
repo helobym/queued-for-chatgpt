@@ -40,12 +40,16 @@ with sync_playwright() as playwright:
           });
         }
       };
-      chrome.commands = { onCommand: { addListener() {} } };
+      window.__shortcutValue = 'Alt+Shift+Q';
+      window.__shortcutPages = [];
+      chrome.commands = { onCommand: { addListener() {} },
+        async getAll() { return [{name:'toggle-queue-panel',shortcut:window.__shortcutValue}]; } };
       chrome.action = { onClicked: { addListener() {} } };
       chrome.scripting = { async removeCSS() {}, async insertCSS() {} };
       chrome.tabs = {
         onUpdated: { addListener() {} }, onRemoved: { addListener() {} },
-        async query() { return []; }
+        async query() { return []; },
+        async create(options) { window.__shortcutPages.push(options.url); return {id:99,...options}; }
       };
       Object.defineProperty(navigator, 'locks', { configurable: true, value: {
         request: async (_name, _opts, fn) => fn({})
@@ -81,6 +85,12 @@ with sync_playwright() as playwright:
     assert page.locator("#qfc-panel").is_visible()
 
     page.locator('[data-action="open-settings"]').click()
+    page.wait_for_function("document.querySelector('#qfc-shortcut-value').textContent === 'Alt+Shift+Q'")
+    page.evaluate("window.__shortcutValue = ''")
+    page.locator('[data-action="refresh-shortcut"]').click()
+    page.wait_for_function("document.querySelector('#qfc-shortcut-value').textContent === 'Not assigned'")
+    page.locator('[data-action="change-shortcut"]').click()
+    page.wait_for_function("window.__shortcutPages.includes('chrome://extensions/shortcuts')")
     timeout = page.locator("#qfc-auto-turn-off")
     assert timeout.input_value() == "5"
     timeout.select_option("0")
@@ -124,6 +134,7 @@ with sync_playwright() as playwright:
     assert payload["version"] == 4
     assert payload["kind"] == "workflows"
     assert payload["settings"]["autoTurnOffMinutes"] == 15
+    assert "shortcut" not in payload["settings"]
     assert payload["settings"]["notificationSettings"]["sound"] == "soft"
     assert payload["settings"]["notificationSettings"]["soundDuration"] == "13"
     assert payload["settings"]["notificationSettings"]["soundVolume"] == 40
@@ -208,4 +219,4 @@ with sync_playwright() as playwright:
     page.wait_for_function("!document.querySelector('#qfc-root')")
     assert page.evaluate("globalThis.__qfcContentLoaded") is False
     browser.close()
-    print("PASS: timeout preferences, minimize/close, v3 import, v4 backup restore, and rollback")
+    print("PASS: Chrome-managed hotkey, idle preferences, minimize/close, backup restore and rollback")

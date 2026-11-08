@@ -128,6 +128,9 @@ with sync_playwright() as playwright:
     page.locator("#qfc-start").click()
     page.locator("#qfc-pause").wait_for(state="visible")
     page.wait_for_function("!document.querySelector('#qfc-pause').disabled",timeout=10000)
+    # A long-running ChatGPT response must not consume the idle allowance.
+    page.wait_for_timeout(600)
+    assert page.locator("#qfc-root").count() == 1
     page.once("dialog", lambda dialog: dialog.accept())
     page.locator('[data-action="turn-off"]').click()
     page.wait_for_function("!document.querySelector('#qfc-root')",timeout=12000)
@@ -153,7 +156,15 @@ with sync_playwright() as playwright:
     page.wait_for_timeout(950)
     assert page.locator("#qfc-root").count() == 1
     page.locator("#qfc-auto-turn-off").select_option("1")
+    # When shutdown left an uncertain prompt, keep it visible for review.
+    uncertain = page.locator('[data-action="confirm-done"]').count() > 0
+    if uncertain:
+        page.wait_for_timeout(500)
+        assert page.locator("#qfc-root").count() == 1
+        page.locator('[data-action="settings-back"]').click()
+        page.once("dialog", lambda dialog: dialog.accept())
+        page.locator('[data-action="confirm-done"]').first.click()
     page.wait_for_function("!document.querySelector('#qfc-root')",timeout=12000)
 
     browser.close()
-    print("PASS: configurable idle sleep, Never, reactivation, manual pause and persisted settings")
+    print("PASS: fresh idle sleep, Never, active-run protection, uncertain review and reactivation")

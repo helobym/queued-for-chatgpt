@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.13 — neutral aligned window controls. */
+/* Queued for ChatGPT v1.2.14 — reliable shortcut and idle-only auto turn-off. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -76,7 +76,8 @@
   let confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
   let autoOffRevision = 0, savedAutoOffRevision = 0;
   let autoOffWriteLoop = null, autoOffSaveStatus = 'Ready';
-  let idleTimer = null, lastQueuedInteraction = Date.now();
+  let idleTimer = null, idleSince = null;
+  let shortcutInfo = { status: 'unknown', value: '' }, shortcutRequest = 0;
   let disposing = false, disposed = false, initialized = false;
   let initializationReady = null, runnerPromise = null, terminalEventPromise = null;
   let uiOperations = 0;
@@ -96,22 +97,27 @@
     return autoTurnOffMinutes > 0 && !disposed && !disposing &&
       !state.running && !runnerPromise && !state.routeLoading && !uiOperations &&
       !notificationWriteLoop && !autoOffWriteLoop &&
-      !pendingWorkflowLoads.size && !hasUnsavedInput();
+      !pendingWorkflowLoads.size && !hasUnsavedInput() &&
+      !state.queue.some(item => item.status !== 'pending');
   }
-  function scheduleIdleSleep() {
+  // Idle time accumulates only while the extension is safe to turn off.
+  // A run or protected operation invalidates the old idle period.
+  function scheduleIdleSleep({ reset = false } = {}) {
     clearIdleTimer();
-    if (!canSleep()) return;
-    const delay = Math.max(0,
-      autoTurnOffMinutes * IDLE_SLEEP_SCALE_MS - (Date.now() - lastQueuedInteraction));
+    if (!canSleep()) { idleSince = null; return; }
+    if (reset || idleSince === null) idleSince = Date.now();
+    const duration = autoTurnOffMinutes * IDLE_SLEEP_SCALE_MS;
+    const delay = Math.max(0, duration - (Date.now() - idleSince));
     idleTimer = setTimeout(() => {
       idleTimer = null;
-      if (canSleep()) void sleepTab(false);
+      if (!canSleep()) { idleSince = null; return; }
+      if (Date.now() - idleSince < duration) { scheduleIdleSleep(); return; }
+      void sleepTab(false);
     }, delay);
   }
   function queuedInteraction() {
     if (disposed || disposing) return;
-    lastQueuedInteraction = Date.now();
-    scheduleIdleSleep();
+    scheduleIdleSleep({ reset: true });
   }
 
   function renderAutoTurnOffSetting() {
@@ -153,7 +159,7 @@
     finally {
       autoOffWriteLoop = null;
       if (savedAutoOffRevision < autoOffRevision) void persistAutoTurnOffMinutes();
-      else scheduleIdleSleep();
+      else scheduleIdleSleep({ reset: true });
     }
   }
   function saveAutoTurnOffMinutes(value) {
@@ -328,7 +334,7 @@
     state.queueRev = record.rev;
     state.queue = C.cleanQueue(record.items);
     state.lastCompleted = C.cleanLastCompleted(record.lastCompleted);
-    render(); wake();
+    render(); wake(); scheduleIdleSleep();
   }
   function applyWorkflows(record) {
     if (!record || record.rev < state.workflowsRev) return;
@@ -565,7 +571,15 @@
             <button type="button" class="qfc-small" data-action="settings-back" aria-label="Back to previous view">← Back</button>
             <strong>Settings</strong>
           </div>
-          <label class="qfc-label" for="qfc-auto-turn-off">Automatically turn off after</label>
+          <strong class="qfc-settings-subtitle">Keyboard shortcut</strong>
+          <div class="qfc-hotkey-row">
+            <code class="qfc-hotkey-value" id="qfc-shortcut-value" aria-live="polite">Checking…</code>
+            <button type="button" class="qfc-small" data-action="refresh-shortcut" title="Refresh assigned shortcut">↻ Refresh</button>
+          </div>
+          <p class="qfc-settings-help" id="qfc-shortcut-help">Minimize, restore or reopen Queued without interrupting a workflow.</p>
+          <button type="button" class="qfc-small qfc-hotkey-manage" data-action="change-shortcut">Change in Chrome</button>
+          <div class="qfc-settings-divider"></div>
+          <label class="qfc-label" for="qfc-auto-turn-off">Automatically turn off after (idle only)</label>
           <select id="qfc-auto-turn-off" aria-describedby="qfc-auto-turn-off-help">
             <option value="0">Never (stay on)</option>
             <option value="1">1 minute</option>
@@ -575,7 +589,7 @@
             <option value="30">30 minutes</option>
             <option value="60">60 minutes</option>
           </select>
-          <p class="qfc-settings-help" id="qfc-auto-turn-off-help">Time without using Queued. Active runs, unsaved edits and saves prevent automatic turn-off.</p>
+          <p class="qfc-settings-help" id="qfc-auto-turn-off-help">The full countdown begins after a run finishes and its sender lock is released. Running or uncertain prompts, unsaved edits and unfinished saves prevent automatic turn-off.</p>
           <p class="qfc-settings-feedback" id="qfc-auto-turn-off-status" role="status" aria-live="polite">Ready</p>
           <div class="qfc-settings-divider"></div>
           <strong class="qfc-settings-subtitle">Desktop notifications</strong>
@@ -822,6 +836,36 @@
     }
     if (pending) return { phase: 'paused', label: 'Paused', suffix: ` · ${pending} pending` };
     return { phase: 'idle', label: 'Idle', suffix: '' };
+  }
+  function renderShortcut() {
+    if (!root) return;
+    const value = root.querySelector('#qfc-shortcut-value');
+    const help = root.querySelector('#qfc-shortcut-help');
+    if (!value || !help) return;
+    value.textContent = shortcutInfo.status === 'assigned' ? shortcutInfo.value
+      : shortcutInfo.status === 'unassigned' ? 'Not assigned'
+        : shortcutInfo.status === 'loading' ? 'Checking…' : 'Unavailable';
+    help.textContent = shortcutInfo.status === 'unassigned'
+      ? 'No key is assigned in Chrome. Choose Change in Chrome to set one.'
+      : shortcutInfo.status === 'unavailable'
+        ? 'Could not read Chrome shortcuts. Check chrome://extensions/shortcuts.'
+        : 'Minimize, restore or reopen Queued without interrupting a running workflow.';
+  }
+  async function refreshShortcut() {
+    const request = ++shortcutRequest;
+    shortcutInfo = { status: 'loading', value: '' };
+    renderShortcut();
+    try {
+      const details = await rpc('getShortcut');
+      if (request !== shortcutRequest || disposed || disposing) return;
+      shortcutInfo = !details?.supported ? { status: 'unavailable', value: '' }
+        : details.shortcut ? { status: 'assigned', value: details.shortcut }
+          : { status: 'unassigned', value: '' };
+    } catch (_) {
+      if (request !== shortcutRequest || disposed || disposing) return;
+      shortcutInfo = { status: 'unavailable', value: '' };
+    }
+    renderShortcut();
   }
   function renderNotificationSettings() {
     if (!root) return;
@@ -1163,8 +1207,18 @@
         settingsOpen = !settingsOpen;
         render();
         renderNotificationSettings();
-        if (settingsOpen) void updateNotificationPermission();
+        if (settingsOpen) {
+          void updateNotificationPermission();
+          void refreshShortcut();
+        }
         setPanelPosition(panelOffsetX, panelOffsetY);
+        break;
+      case 'refresh-shortcut':
+        await refreshShortcut();
+        break;
+      case 'change-shortcut':
+        try { await rpc('openShortcutSettings'); }
+        catch (_) { notify('Could not open Chrome shortcuts. Open chrome://extensions/shortcuts manually.'); }
         break;
       case 'settings-back':
         settingsOpen = false;
@@ -1799,6 +1853,7 @@
     // Detect edits that happened in another tab after the user approved starting.
     const initialRevision = state.queueRev;
     state.running = true;
+    idleSince = null;
     clearIdleTimer();
     setStatus(workflow ? `Preparing workflow “${workflow.name}”…` : 'Starting queue…');
     const pendingRunner = navigator.locks.request('qfc-queue-' + route, { ifAvailable: true }, async lock => {
@@ -1860,8 +1915,13 @@
         'Discard the unsaved Queued text or workflow edit and turn off only this tab?')) return false;
     } else if (!canSleep()) return false;
     disposing = true;
+    idleSince = null;
     clearIdleTimer();
+    // Stop the runner immediately, before an asynchronous shutdown handshake.
     if (state.running) pause('Paused by you.', 'manual');
+    // Announce closing while the receiver is still registered. Commands issued
+    // during shutdown are deferred until cleanup is actually complete.
+    try { await rpc('tabClosing'); } catch (_) { /* Continue safe shutdown. */ }
     // The lock callback can still be awaiting an RPC or receipt check.
     // Never tear down its state before it has released the Web Lock.
     if (runnerPromise) await runnerPromise.catch(() => {});
@@ -1892,6 +1952,8 @@
     signalListeners.clear(); pendingWorkflowLoads.clear();
     disposed = true;
     globalThis.__qfcContentLoaded = false;
+    // The background may now safely reinject after a deferred shortcut.
+    try { await rpc('tabClosed'); } catch (_) { /* Shutdown must still finish. */ }
     return true;
   }
 
@@ -1998,7 +2060,7 @@
         confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
         autoOffSaveStatus = 'Saved';
         renderAutoTurnOffSetting();
-        scheduleIdleSleep();
+        scheduleIdleSleep({ reset: true });
       }
       if (changes[C.NOTIFICATION_SETTINGS_KEY] && !notificationWriteLoop &&
           settingsRevision === savedSettingsRevision) {
@@ -2018,7 +2080,7 @@
   function onUiMessage(message, sender, sendResponse) {
     if (sender?.id !== chrome.runtime.id || message?.app !== 'qfc-ui-v1') return false;
     if (message.action === 'status') {
-      sendResponse({ active: !disposed && !disposing, ready: initialized });
+      sendResponse({ active: !disposed && !disposing, closing: disposing, ready: initialized });
       return false;
     }
     if (message.action !== 'open-panel' && message.action !== 'toggle-panel') return false;

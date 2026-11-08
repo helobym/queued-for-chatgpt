@@ -1,11 +1,11 @@
-QUEUED FOR CHATGPT — v1.2.12 to v1.2.13
+QUEUED FOR CHATGPT — v1.2.13 to v1.2.14
 
 [ ] Allow active workflows to finish or pause and review uncertain sending/awaiting prompts.
 [ ] Export important Saved Workflows (v1.2.12 JSON backups also include all settings).
 [ ] Keep the SAME installed folder and extension ID: do not uninstall or load a second copy.
-[ ] Download queued-for-chatgpt-v1.2.13.zip from GitHub Release v1.2.13 and extract it.
+[ ] Download queued-for-chatgpt-v1.2.14.zip from GitHub Release v1.2.14 and extract it.
 [ ] Replace extension files in the existing folder, keeping the original extension directory.
-[ ] Open chrome://extensions, Reload the existing Queued extension and verify v1.2.13.
+[ ] Open chrome://extensions, Reload the existing Queued extension and verify v1.2.14.
 [ ] Refresh your ChatGPT tabs, then activate Queued from the Chrome toolbar or Alt+Shift+Q.
 [ ] Verify header order: Settings, Reset position, − minimize, ✕ close/turn off.
 [ ] Verify − and ✕ use matching neutral backgrounds, colors and bold text in light/dark mode.
@@ -15,6 +15,10 @@ QUEUED FOR CHATGPT — v1.2.12 to v1.2.13
 [ ] Change auto turn-off to Never and verify it does not sleep while idle.
 [ ] Choose 1, 10, 15, 30 or 60 minutes and verify the choice is saved and shared between tabs.
 [ ] Verify active runs, unsaved edits and unfinished saves prevent automatic sleep.
+[ ] Open Settings → Keyboard shortcut: verify Chrome's actual assignment, Refresh, and Change in Chrome.
+[ ] Confirm the hotkey minimizes, restores, and reopens Queued without interrupting running prompts.
+[ ] Confirm auto turn-off starts a FULL fresh idle countdown after a long workflow finishes.
+[ ] Confirm uncertain sending/awaiting prompts do not auto turn off before review.
 [ ] Verify notification switches, sound, volume, duration, and visibility are unchanged.
 [ ] Export workflows + settings JSON. Check the backup contains autoTurnOffMinutes and notificationSettings.
 [ ] Import a version 4 JSON backup; approve the settings restore and verify values.
