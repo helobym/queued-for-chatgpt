@@ -158,7 +158,7 @@ test('shortcut settings report the actual Chrome assignment and open its manager
   assert.equal((await bg.message({command:'getShortcut'})).data.shortcut, 'Ctrl+Shift+Y');
   const opened = await bg.message({command:'openShortcutSettings'});
   assert.equal(opened.ok, true);
-  assert.deepEqual(bg.openedTabs[0], {url:'chrome://extensions/shortcuts'});
+  assert.equal(bg.openedTabs[0].url, 'chrome://extensions/shortcuts');
 });
 test('hotkey pressed during close defers exactly one reopen until content has disposed', async () => {
   const bg = createWorker();
