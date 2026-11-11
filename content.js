@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.14 — reliable shortcut and idle-only auto turn-off. */
+/* Queued for ChatGPT v1.2.15 — recoverable close/reopen and idle-only auto turn-off. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -1921,39 +1921,47 @@
     if (state.running) pause('Paused by you.', 'manual');
     // Announce closing while the receiver is still registered. Commands issued
     // during shutdown are deferred until cleanup is actually complete.
-    try { await rpc('tabClosing'); } catch (_) { /* Continue safe shutdown. */ }
-    // The lock callback can still be awaiting an RPC or receipt check.
-    // Never tear down its state before it has released the Web Lock.
-    if (runnerPromise) await runnerPromise.catch(() => {});
-    if (terminalEventPromise) await terminalEventPromise.catch(() => {});
-    if (notificationWriteLoop) await notificationWriteLoop.catch(() => {});
-    if (autoOffWriteLoop) await autoOffWriteLoop.catch(() => {});
-    for (const timer of transientTimers) clearTimeout(timer);
-    transientTimers.clear();
-    for (const url of pendingDownloadUrls) URL.revokeObjectURL(url);
-    pendingDownloadUrls.clear();
-    if (routeTimer) clearTimeout(routeTimer);
-    routeTimer = null;
-    pageObserver?.disconnect();
-    wake();
-    for (const cleanup of cleanupListeners.splice(0)) cleanup();
     try {
-      const handle = root?.querySelector('.qfc-drag-handle');
-      if (panelDrag && handle?.hasPointerCapture(panelDrag.id)) handle.releasePointerCapture(panelDrag.id);
-    } catch (_) {}
-    panelDrag = null;
-    // The worker serializes CSS cleanup with shortcut reactivation per tab.
-    // No prompts, settings or workflow records are removed.
-    try { await rpc('tabSleep'); } catch (_) {}
-    root?.remove();
-    root = queueList = workflowsList = statusLine = queueTextArea = workflowSearch = null;
-    state.queue = []; state.workflows = []; state.workflowDraft = null;
-    expandedWorkflowIds.clear(); temporaryRouteCache.clear(); temporaryRouteKeys.clear();
-    signalListeners.clear(); pendingWorkflowLoads.clear();
-    disposed = true;
-    globalThis.__qfcContentLoaded = false;
-    // The background may now safely reinject after a deferred shortcut.
-    try { await rpc('tabClosed'); } catch (_) { /* Shutdown must still finish. */ }
+      try { await rpc('tabClosing', { instanceId: PAGE_ID }); } catch (_) { /* Continue safe shutdown. */ }
+      // Never tear down a runner before it has released the Web Lock.
+      if (runnerPromise) await runnerPromise.catch(() => {});
+      if (terminalEventPromise) await terminalEventPromise.catch(() => {});
+      if (notificationWriteLoop) await notificationWriteLoop.catch(() => {});
+      if (autoOffWriteLoop) await autoOffWriteLoop.catch(() => {});
+    } finally {
+      // Finalization must run even when an operation above fails. A partially
+      // disposed script must never retain its injection guard permanently.
+      for (const timer of transientTimers) clearTimeout(timer);
+      transientTimers.clear();
+      for (const url of pendingDownloadUrls) {
+        try { URL.revokeObjectURL(url); } catch (_) {}
+      }
+      pendingDownloadUrls.clear();
+      if (routeTimer) clearTimeout(routeTimer);
+      routeTimer = null;
+      try { pageObserver?.disconnect(); } catch (_) {}
+      try { wake(); } catch (_) {}
+      for (const cleanup of cleanupListeners.splice(0)) {
+        try { cleanup(); } catch (_) { /* Continue disposing other listeners. */ }
+      }
+      try {
+        const handle = root?.querySelector('.qfc-drag-handle');
+        if (panelDrag && handle?.hasPointerCapture(panelDrag.id)) handle.releasePointerCapture(panelDrag.id);
+      } catch (_) {}
+      panelDrag = null;
+      // Serialize CSS removal before releasing the guard for reinjection.
+      try { await rpc('tabSleep'); } catch (_) {}
+      try { root?.remove(); } catch (_) {}
+      root = queueList = workflowsList = statusLine = queueTextArea = workflowSearch = null;
+      state.queue = []; state.workflows = []; state.workflowDraft = null;
+      expandedWorkflowIds.clear(); temporaryRouteCache.clear(); temporaryRouteKeys.clear();
+      signalListeners.clear(); pendingWorkflowLoads.clear();
+      disposed = true;
+      globalThis.__qfcContentLoaded = false;
+      try { await rpc('tabClosed', { instanceId: PAGE_ID }); } catch (_) {
+        // A later toolbar click can now detect that the guard is gone.
+      }
+    }
     return true;
   }
 
@@ -2080,7 +2088,13 @@
   function onUiMessage(message, sender, sendResponse) {
     if (sender?.id !== chrome.runtime.id || message?.app !== 'qfc-ui-v1') return false;
     if (message.action === 'status') {
-      sendResponse({ active: !disposed && !disposing, closing: disposing, ready: initialized });
+      sendResponse({
+        active: !disposed && !disposing && Boolean(root?.isConnected),
+        closing: disposing && !disposed,
+        ready: initialized,
+        open: state.open,
+        instanceId: PAGE_ID
+      });
       return false;
     }
     if (message.action !== 'open-panel' && message.action !== 'toggle-panel') return false;

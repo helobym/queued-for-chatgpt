@@ -10,6 +10,8 @@ function createWorker(stored = {}) {
   let shortcut = 'Alt+Shift+Q';
   const sent = [], injected = [], css = [], openedTabs = [];
   const activeTabs = new Set();
+  const guardedTabs = new Set(), closingReceivers = new Set();
+  let failToggle = false;
   const db = JSON.parse(JSON.stringify(stored));
   const ext = { id: 'test-extension' };
   const context = vm.createContext({
@@ -21,7 +23,11 @@ function createWorker(stored = {}) {
       scripting: {
         async insertCSS(opts) { css.push(['insert',opts.target.tabId]); },
         async removeCSS(opts) { css.push(['remove',opts.target.tabId]); },
-        async executeScript(opts) { injected.push([opts.target.tabId,...opts.files]); }
+        async executeScript(opts) {
+          if (opts.func) return [{ result: guardedTabs.has(opts.target.tabId) }];
+          injected.push([opts.target.tabId,...opts.files]);
+          guardedTabs.add(opts.target.tabId);
+        }
       },
       tabs: {
         async create(options) { openedTabs.push(options); return { id: 100 + openedTabs.length, ...options }; },
@@ -32,9 +38,15 @@ function createWorker(stored = {}) {
           sent.push({id, message});
           if (message.action === 'status') {
             if (!activeTabs.has(id)) throw new Error('No receiving end');
-            return {active:true};
+            if (closingReceivers.has(id))
+              return {active:false,closing:true,instanceId:'session-42'};
+            return {active:true,closing:false,instanceId:'session-42'};
           }
           if (message.action === 'open-panel') { activeTabs.add(id); return {active:true}; }
+          if (message.action === 'toggle-panel' && failToggle) {
+            failToggle = false;
+            return {active:false};
+          }
           return {active:true};
         }
       },
@@ -49,7 +61,11 @@ function createWorker(stored = {}) {
   vm.runInContext(fs.readFileSync(path.join(base, 'background.js'), 'utf8'), context, { filename: 'background.js' });
   return { db, sent, injected, css, openedTabs,
     setShortcut(value) { shortcut = value; },
-    closeTab(id) { activeTabs.delete(id); },
+    closeTab(id) { activeTabs.delete(id); guardedTabs.delete(id); closingReceivers.delete(id); },
+    dropReceiver(id) { activeTabs.delete(id); },
+    finishDisposal(id) { guardedTabs.delete(id); closingReceivers.delete(id); },
+    markClosing(id) { closingReceivers.add(id); },
+    failNextToggle() { failToggle = true; },
     command(command, tab) { return commandListener(command, tab); },
     action(tab) { return actionListener(tab); },
     rejectReceiver() { rejectSend = true; },
@@ -164,13 +180,58 @@ test('hotkey pressed during close defers exactly one reopen until content has di
   const bg = createWorker();
   await bg.command('toggle-queue-panel', {id:42,url:'https://chatgpt.com/c/mychat'});
   assert.equal(bg.injected.length, 1);
-  bg.closeTab(42);
-  await bg.message({command:'tabClosing'});
+  bg.dropReceiver(42); // The guard is still set while shutdown is in progress.
+  await bg.message({command:'tabClosing',instanceId:'session-42'});
   await bg.command('toggle-queue-panel', {id:42,url:'https://chatgpt.com/c/mychat'});
   await bg.command('toggle-queue-panel', {id:42,url:'https://chatgpt.com/c/mychat'});
   assert.equal(bg.injected.length, 1, 'no injection until old instance has been removed');
-  await bg.message({command:'tabClosed'});
+  bg.finishDisposal(42);
+  await bg.message({command:'tabClosed',instanceId:'session-42'});
   await new Promise(resolve => setTimeout(resolve, 15));
   assert.equal(bg.injected.length, 2, 'one deferred reopen for repeated shortcut requests');
   assert.equal(bg.sent.at(-1).message.action, 'open-panel');
+});
+
+test('toolbar recovers stale closing state when final acknowledgment was lost', async () => {
+  const bg = createWorker();
+  const tab = {id:42,url:'https://chatgpt.com/c/mychat'};
+  await bg.action(tab);
+  bg.dropReceiver(42);
+  await bg.message({command:'tabClosing',instanceId:'session-42'});
+  bg.finishDisposal(42); // Content removed its guard, but tabClosed never arrived.
+  await bg.action(tab);
+  assert.equal(bg.injected.length, 2);
+  assert.equal(bg.sent.at(-1).message.action, 'open-panel');
+  await bg.message({command:'tabClosed',instanceId:'session-42'});
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(bg.injected.length, 2, 'late closed acknowledgment must not toggle the new panel');
+});
+
+test('closing receiver and delayed previous-instance acknowledgment cannot reinject early', async () => {
+  const bg = createWorker();
+  const tab = {id:42,url:'https://chatgpt.com/c/mychat'};
+  await bg.action(tab);
+  bg.markClosing(42);
+  await bg.message({command:'tabClosing',instanceId:'session-42'});
+  await bg.action(tab); // Status reports closing, even though its receiver exists.
+  await bg.message({command:'tabClosed',instanceId:'different-old-instance'});
+  await bg.message({command:'tabClosed'}); // A legacy acknowledgment cannot clear the newer record.
+  assert.equal(bg.injected.length, 1);
+  bg.dropReceiver(42);
+  bg.finishDisposal(42);
+  await bg.message({command:'tabClosed',instanceId:'session-42'});
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(bg.injected.length, 2);
+});
+
+test('a failed toggle response does not blindly toggle twice or reinject', async () => {
+  const bg = createWorker();
+  const tab = {id:42,url:'https://chatgpt.com/c/mychat'};
+  await bg.action(tab);
+  bg.failNextToggle();
+  await bg.action(tab);
+  assert.equal(bg.injected.length, 1);
+  assert.equal(bg.sent.filter(x => x.message.action === 'toggle-panel').length, 1);
+  await bg.action(tab);
+  assert.equal(bg.sent.filter(x => x.message.action === 'toggle-panel').length, 2);
 });

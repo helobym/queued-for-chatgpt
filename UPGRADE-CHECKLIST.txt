@@ -1,16 +1,17 @@
-QUEUED FOR CHATGPT — v1.2.13 to v1.2.14
+QUEUED FOR CHATGPT — v1.2.14 to v1.2.15
 
 [ ] Allow active workflows to finish or pause and review uncertain sending/awaiting prompts.
 [ ] Export important Saved Workflows (v1.2.12 JSON backups also include all settings).
 [ ] Keep the SAME installed folder and extension ID: do not uninstall or load a second copy.
-[ ] Download queued-for-chatgpt-v1.2.14.zip from GitHub Release v1.2.14 and extract it.
+[ ] Download queued-for-chatgpt-v1.2.15.zip from GitHub Release v1.2.15 and extract it.
 [ ] Replace extension files in the existing folder, keeping the original extension directory.
-[ ] Open chrome://extensions, Reload the existing Queued extension and verify v1.2.14.
+[ ] Open chrome://extensions, Reload the existing Queued extension and verify v1.2.15.
 [ ] Refresh your ChatGPT tabs, then activate Queued from the Chrome toolbar or Alt+Shift+Q.
 [ ] Verify header order: Settings, Reset position, − minimize, ✕ close/turn off.
 [ ] Verify − and ✕ use matching neutral backgrounds, colors and bold text in light/dark mode.
 [ ] Verify the header's − button minimizes only to the compact live Queue dock.
-[ ] Verify the header's ✕ button turns Queued off only in that tab and can be reopened.
+[ ] Verify ✕ turns Queued off in that tab; reopen using both the Chrome toolbar and the assigned shortcut.
+[ ] Verify repeated clicks during shutdown do not create duplicate panels or running queues.
 [ ] Open ⚙ Settings and verify auto turn-off defaults to 5 minutes after upgrade.
 [ ] Change auto turn-off to Never and verify it does not sleep while idle.
 [ ] Choose 1, 10, 15, 30 or 60 minutes and verify the choice is saved and shared between tabs.

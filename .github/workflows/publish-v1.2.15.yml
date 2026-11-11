@@ -1,0 +1,193 @@
+name: Publish v1.2.15 GitHub Release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v1.2.15.yml'
+      - 'content.js'
+      - 'content.css'
+      - 'background.js'
+      - 'core.js'
+      - 'offscreen.html'
+      - 'offscreen.js'
+      - 'manifest.json'
+      - 'tests/**'
+      - 'README.md'
+      - 'PRIVACY.md'
+      - 'CHANGELOG.md'
+      - 'UPGRADE-CHECKLIST.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout v1.2.15 source
+        uses: actions/checkout@v4
+
+      - name: Set up Python for simulated browser tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run JavaScript queue and coordinator tests
+        run: |
+          node --test tests/*.test.js
+          node --check content.js
+          node --check background.js
+          node --check offscreen.js
+          node --check core.js
+          node --check coordinator.js
+
+      - name: Check Python regression script syntax and preview asset
+        run: |
+          python3 -m compileall -q tests
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree
+          ElementTree.parse('screenshots/workflows-v1.2.7.svg')
+          ElementTree.parse('screenshots/queue-v1.2.7.svg')
+          assert 'Recent activity' in Path('content.js').read_text(encoding='utf-8')
+          assert 'hasNewUserReceipt' in Path('content.js').read_text(encoding='utf-8')
+          assert 'lastCompleted' in Path('coordinator.js').read_text(encoding='utf-8')
+          assert 'releases/tag/v1.2.15' in Path('README.md').read_text(encoding='utf-8')
+          assert 'qfc-auto-turn-off' in Path('content.js').read_text(encoding='utf-8')
+          assert 'qfc-shortcut-value' in Path('content.js').read_text(encoding='utf-8')
+          assert 'tabClosing' in Path('background.js').read_text(encoding='utf-8')
+          assert 'tabClosed' in Path('content.js').read_text(encoding='utf-8')
+          assert "version: 4" in Path('content.js').read_text(encoding='utf-8')
+          assert 'validateBackupSettings' in Path('core.js').read_text(encoding='utf-8')
+          assert '+ Load' in Path('content.js').read_text(encoding='utf-8')
+          assert 'load-workflow' in Path('content.js').read_text(encoding='utf-8')
+          assert 'projectLandingId' in Path('content.js').read_text(encoding='utf-8')
+          assert "case 'copy':" in Path('content.js').read_text(encoding='utf-8')
+          assert "case 'copy-workflow-step':" in Path('content.js').read_text(encoding='utf-8')
+          assert "function dockDisplay()" in Path('content.js').read_text(encoding='utf-8')
+          assert "state.senderLockRoute = route;" in Path('content.js').read_text(encoding='utf-8')
+          assert "qfc-workflow-details" in Path('content.js').read_text(encoding='utf-8')
+          assert "qfc-activity-details" in Path('content.js').read_text(encoding='utf-8')
+          assert "qfc-ui-v1" in Path('background.js').read_text(encoding='utf-8')
+          import json
+          manifest = json.loads(Path('manifest.json').read_text(encoding='utf-8'))
+          assert manifest['commands']['toggle-queue-panel']['suggested_key']['default'] == 'Alt+Shift+Q'
+          assert 'notifications' in manifest['permissions']
+          assert 'offscreen' in manifest['permissions']
+          assert "qfc-disclosure" in Path('content.js').read_text(encoding='utf-8')
+          assert 'qfc_v1_notification_settings' in Path('core.js').read_text(encoding='utf-8')
+          assert Path('offscreen.html').is_file() and Path('offscreen.js').is_file()
+          assert "command: 'runLifecycle'" in Path('content.js').read_text(encoding='utf-8')
+          assert "chrome.notifications" in Path('background.js').read_text(encoding='utf-8')
+          PY
+
+      - name: Install Chromium for simulated browser tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install playwright==1.56.0
+          python3 -m playwright install --with-deps chromium
+          CHROME="$(find "$HOME/.cache/ms-playwright" -type f \( -path '*/chrome-linux64/chrome' -o -path '*/chrome-linux/chrome' \) | head -n 1)"
+          test -n "$CHROME"
+          sudo ln -sf "$CHROME" /usr/bin/chromium
+
+      - name: Run simulated Chromium reliability regressions
+        run: |
+          python3 tests/smoke_v129_settings.py
+          python3 tests/smoke_settings_backup.py
+          python3 tests/smoke_tab_sleep.py
+          python3 tests/smoke_idle_after_run.py
+          python3 tests/smoke_workflow_scroll.py
+          python3 tests/smoke_notifications.py
+          python3 tests/smoke_v127_ui.py
+          python3 tests/smoke_send_receipt_safety.py
+          python3 tests/smoke_stop_lifecycle.py
+          python3 tests/smoke_app_shell.py
+          python3 tests/smoke_app_shell_uncertain.py
+          python3 tests/smoke_first_reply_uncertain.py
+          python3 tests/smoke_first_reply_fallback.py
+          python3 tests/smoke_workflow_load_during_run.py
+          python3 tests/smoke_workflow_new_chat.py
+          python3 tests/smoke_workflow_direct_start_safety.py
+          python3 tests/smoke_project_workflows.py
+          python3 tests/smoke_queue_copy.py
+          python3 tests/smoke_workflows.py
+          python3 tests/smoke_draggable_panel.py
+          python3 tests/smoke_browser.py
+
+      - name: Create unpacked-extension ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import zipfile
+
+          root = pathlib.Path('.')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+          assert manifest['version'] == '1.2.15', 'This workflow only publishes v1.2.15'
+          required = [
+              'manifest.json', 'background.js', 'content.js', 'content.css',
+              'offscreen.html', 'offscreen.js',
+              'core.js', 'coordinator.js', 'LICENSE', 'NOTICE.txt',
+              'PRIVACY.md', 'README.md', 'UPGRADE-CHECKLIST.txt'
+          ]
+          required += [str(f) for f in sorted((root / 'icons').glob('*.png'))]
+          assert len(required) >= 14, 'Extension icons are missing'
+          archive = pathlib.Path('queued-for-chatgpt-v1.2.15.zip')
+          with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as zipped:
+              for name in required:
+                  file = root / name
+                  assert file.is_file(), f'Missing {name}'
+                  zipped.write(file, arcname=name)
+          with zipfile.ZipFile(archive) as zipped:
+              assert zipped.testzip() is None, 'Corrupt ZIP'
+              assert 'manifest.json' in zipped.namelist(), 'Manifest must be at ZIP root'
+          checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+          pathlib.Path('queued-for-chatgpt-v1.2.15.zip.sha256').write_text(
+              f'{checksum}  {archive.name}\n', encoding='utf-8')
+          print(f'Packaged {archive} ({archive.stat().st_size} bytes); SHA256 {checksum}')
+          PY
+
+      - name: Publish v1.2.15 with installation package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cat > /tmp/qfc-release-notes.md <<'NOTES'
+          ## Queued for ChatGPT v1.2.15
+
+          A lightweight Chrome / Chromebook extension for safe, on-demand ChatGPT workflows.
+
+          ### New in v1.2.15
+          - **Reopen recovery:** Toolbar and shortcut activation recover from stale closing state and lost shutdown acknowledgments.
+          - **Safe shutdown:** One active content instance per tab; queued prompts remain paused when close is confirmed.
+          - **Lightweight:** No new permissions, persistent polling, external libraries, or changes to version 4 backups.
+          - **Regression coverage:** Additional worker and simulated Chromium close/reopen tests.
+
+          ### Install or upgrade
+          1. Download **queued-for-chatgpt-v1.2.15.zip** from the Assets section and extract it.
+          2. At `chrome://extensions`, select **Load unpacked** and select the extracted folder containing `manifest.json`.
+          3. For existing installations, preserve the same extension folder and ID, replace its files, select **Reload** and refresh ChatGPT tabs. Include the new `offscreen.html` and `offscreen.js` files.
+          4. The existing **activeTab**, **scripting**, **offscreen** and notification permissions remain unchanged.
+
+          ### Validation
+          Node and simulated Chromium tests cover close/reopen recovery, idle sleep, hotkeys and existing queue safeguards. Real-device ChatGPT and Chromebook memory tests remain recommended.
+
+          [README](https://github.com/helobym/queued-for-chatgpt#readme) · [Privacy](https://github.com/helobym/queued-for-chatgpt/blob/main/PRIVACY.md) · [MIT License](https://github.com/helobym/queued-for-chatgpt/blob/main/LICENSE)
+          NOTES
+          if gh release view v1.2.15 >/dev/null 2>&1; then
+            echo 'v1.2.15 release already exists; refusing to overwrite tagged release assets.'
+            exit 0
+          fi
+          gh release create v1.2.15 queued-for-chatgpt-v1.2.15.zip queued-for-chatgpt-v1.2.15.zip.sha256 \
+            --title 'Queued for ChatGPT v1.2.15' \
+            --notes-file /tmp/qfc-release-notes.md \
+            --target "$GITHUB_SHA" \
+            --latest

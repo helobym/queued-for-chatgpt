@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.14 — on-demand activation, safe reactivation and notifications. */
+/* Queued for ChatGPT v1.2.15 — on-demand activation, recoverable shutdown and notifications. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;
@@ -267,17 +267,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.command === 'tabClosing' || message.command === 'tabClosed') {
     const tabId = sender.tab?.id;
     if (!Number.isSafeInteger(tabId) || tabId < 0) return false;
+    // A late acknowledgment from an older content instance must never clear
+    // a newer instance's shutdown request.
+    const instanceId = typeof message.instanceId === 'string' && RUN_ID.test(message.instanceId)
+      ? message.instanceId : null;
     if (message.command === 'tabClosing') {
-      // A shortcut requested during shutdown is deferred until the previous
-      // content instance has removed its listeners, DOM and injection guard.
       const previous = closingTabs.get(tabId);
-      closingTabs.set(tabId, { reopen: previous?.reopen === true });
+      closingTabs.set(tabId, { instanceId, reopen: previous?.reopen === true });
       sendResponse({ ok: true, data: { closing: true } });
     } else {
       const pending = closingTabs.get(tabId);
-      closingTabs.delete(tabId);
-      sendResponse({ ok: true, data: { closed: true } });
-      if (pending?.reopen) {
+      const matches = !pending?.instanceId || pending.instanceId === instanceId;
+      if (matches) closingTabs.delete(tabId);
+      sendResponse({ ok: true, data: { closed: matches } });
+      if (matches && pending?.reopen) {
         void (async () => {
           try {
             const tab = await chrome.tabs.get(tabId);
@@ -361,6 +364,24 @@ function isChatGPTTab(url) {
 async function sendUi(tabId, action) {
   return chrome.tabs.sendMessage(tabId, { app: 'qfc-ui-v1', action });
 }
+// Inspect the existing isolated-world guard only when messaging is unavailable.
+// This avoids reinjecting while the old content script is still tearing down.
+async function contentGuardActive(tabId) {
+  const result = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => globalThis.__qfcContentLoaded === true
+  });
+  if (typeof result?.[0]?.result !== 'boolean')
+    throw new Error('Could not verify the prior Queued instance.');
+  return result[0].result;
+}
+function deferReopen(tabId, instanceId = null) {
+  const previous = closingTabs.get(tabId);
+  closingTabs.set(tabId, {
+    instanceId: instanceId || previous?.instanceId || null,
+    reopen: true
+  });
+}
 async function openOrToggleTab(tab) {
   if (!Number.isSafeInteger(tab?.id)) return;
   return sequenceTab(tab.id, async () => {
@@ -368,24 +389,35 @@ async function openOrToggleTab(tab) {
     let target = tab;
     if (!target.url && chrome.tabs.get) target = await chrome.tabs.get(tab.id);
     if (!isChatGPTTab(target?.url)) return;
-    if (closingTabs.has(tab.id)) {
-      closingTabs.get(tab.id).reopen = true;
-      return;
-    }
     let status = null;
     try { status = await sendUi(tab.id, 'status'); }
-    catch (_) { /* A sleeping tab has no message receiver. */ }
+    catch (_) { /* A sleeping or tearing-down tab may not have a receiver. */ }
     if (status?.closing) {
-      const closing = closingTabs.get(tab.id) || { reopen: false };
-      closing.reopen = true;
-      closingTabs.set(tab.id, closing);
+      deferReopen(tab.id, status.instanceId);
       return;
     }
     if (status?.active) {
-      await sendUi(tab.id, 'toggle-panel');
+      // A previous shutdown record is stale when a live instance answers.
+      closingTabs.delete(tab.id);
+      let toggled = null;
+      try { toggled = await sendUi(tab.id, 'toggle-panel'); } catch (_) {}
+      if (toggled?.active) return;
+      // Do not blindly toggle again: the first toggle might have succeeded.
+      try { status = await sendUi(tab.id, 'status'); } catch (_) { status = null; }
+      if (status?.closing) {
+        deferReopen(tab.id, status.instanceId);
+        return;
+      }
+      if (status?.active) throw new Error('Queued panel toggle could not be confirmed.');
+    }
+    // A missing receiver alone is not proof that a script is safe to reinject.
+    // A lost tabClosed acknowledgment can leave a stale closingTabs entry;
+    // the actual content guard is authoritative on the next user activation.
+    if (await contentGuardActive(tab.id)) {
+      deferReopen(tab.id);
       return;
     }
-    // CSS is installed only for an activated tab and removed on successful sleep.
+    closingTabs.delete(tab.id);
     await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
     try {
       await chrome.scripting.executeScript({

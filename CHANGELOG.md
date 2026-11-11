@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.15 (2026-11-11)
+
+- Recovered toolbar and shortcut activation when a prior shutdown acknowledgment was lost or its closing marker became stale.
+- Used the existing isolated-world injection guard to avoid reopening during content-script teardown.
+- Made per-tab shutdown acknowledgments instance-aware and finalized listener/DOM cleanup even after noncritical errors.
+- Preserved single-instance activation, sender locks, idle sleep, queue safety, and existing settings without adding permissions or persistent polling.
+- Expanded background and simulated-browser regression coverage for manual close, automatic sleep, and interrupted reopening.
+
 ## 1.2.14 (2026-11-08)
 
 - Added a readout of Chrome's assigned shortcut, an unassigned warning, Refresh and Change in Chrome controls in Settings.

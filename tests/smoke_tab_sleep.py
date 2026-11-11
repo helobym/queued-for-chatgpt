@@ -54,15 +54,28 @@ with sync_playwright() as playwright:
         async remove(k){delete session[k];}
       };
       chrome.commands={onCommand:{addListener(){}}};
-      chrome.action={onClicked:{addListener(){}}};
+      chrome.action={onClicked:{addListener(fn){window.__qfcAction=fn;}}};
       chrome.scripting={
         async removeCSS(){window.__removedCss++;},
         async insertCSS(){},
-        async executeScript(){}
+        async executeScript(options){
+          if(options.func)return [{result:options.func()}];
+          const script=document.createElement('script');
+          script.textContent=window.__qfcSource;
+          document.body.append(script);
+          script.remove();
+          return [{result:undefined}];
+        }
       };
       chrome.tabs={
         onUpdated:{addListener(){}},onRemoved:{addListener(){}},
-        async query(){return[];},async sendMessage(){},
+        async get(id){return {id,url:'https://chatgpt.com/c/sleep-test'};},
+        async query(){return[{id:42,url:'https://chatgpt.com/c/sleep-test'}];},
+        async sendMessage(_id,message){
+          const response=await chrome.runtime.sendMessage(message);
+          if(!response)throw new Error('No receiving end');
+          return response;
+        }
       };
       chrome.notifications={
         onClicked:{addListener(){}},
@@ -74,12 +87,12 @@ with sync_playwright() as playwright:
       }});
     }""")
     page.add_script_tag(path=str(ROOT / "background.js"))
+    page.evaluate("source => { window.__qfcSource = source; }", SOURCE)
     def activate():
-        page.add_script_tag(content=SOURCE)
-        page.locator("#qfc-root").wait_for()
-        page.evaluate("""async()=>await chrome.runtime.sendMessage({
-          app:'qfc-ui-v1', action:'open-panel'
+        page.evaluate("""async () => await window.__qfcAction({
+          id:42,url:'https://chatgpt.com/c/sleep-test'
         })""")
+        page.locator("#qfc-root").wait_for()
         assert page.locator("#qfc-panel").is_visible()
 
     activate()

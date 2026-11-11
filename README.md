@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.14 — Reliable Hotkey and Idle-Only Sleep
+# Queued for ChatGPT v1.2.15 — Reliable Reopening After Close
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.14](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.14)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.15](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.15)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.15:** Toolbar and shortcut reopening recover from interrupted per-tab shutdowns and lost acknowledgments without duplicate content scripts. The close button still releases idle UI resources, and uncertain prompts remain paused for manual review. No new permissions, storage migrations, or continuous polling.
 
 **New in v1.2.14:** ⚙ Settings shows the shortcut actually assigned by Chrome, including an unassigned warning and Refresh / Change in Chrome controls. A shortcut pressed during shutdown safely reopens Queued after full cleanup. Auto-turn-off counts only eligible idle time, starting a fresh countdown after a running workflow finishes; uncertain prompts stay available for review. The workflow backup format and Chrome-managed key assignment remain unchanged.
 
@@ -36,13 +38,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.14 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13), expand **Assets**, and download **`queued-for-chatgpt-v1.2.14.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.15 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.15), expand **Assets**, and download **`queued-for-chatgpt-v1.2.15.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.13**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.15**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Click the **Queued for ChatGPT** toolbar icon or press the currently assigned shortcut (suggested **Alt+Shift+Q**). If the hotkey does nothing, open ⚙ Settings → Keyboard shortcut or `chrome://extensions/shortcuts` to check its assignment. Pin the extension in Chrome's toolbar for easier access.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -156,7 +158,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.14.zip`** from the [v1.2.14 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.13) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.15.zip`** from the [v1.2.15 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.15) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs. Queued will remain asleep until you use its toolbar icon or Alt+Shift+Q in each tab.
