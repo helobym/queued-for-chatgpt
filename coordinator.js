@@ -57,6 +57,10 @@
       case 'sending':
         if (!next.length || next[0].id !== id || next[0].status !== 'pending') error('Queue changed before sending. Paused.');
         next[0].status = 'sending'; break;
+      case 'cancel-unsent':
+        // Internal rollback only before an insertion attempt, under the sender lock.
+        if (!next.length || next[0].id !== id || next[0].status !== 'sending') error('Unsent reservation changed. Review the queue.');
+        next[0].status = 'pending'; break;
       case 'awaiting':
         if (!next.length || next[0].id !== id || next[0].status !== 'sending') error('Submission state changed. Paused.');
         next[0].status = 'awaiting'; break;

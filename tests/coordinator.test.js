@@ -95,3 +95,17 @@ test('snapshot is not rewritten by duplicate completion operation', () => {
   assert.equal(replay.duplicate, true);
   assert.deepEqual(replay.record.lastCompleted, first.lastCompleted);
 });
+
+test('only a reserved sending head can return to pending before insertion', () => {
+  let q = trans(M.record([]), 'queue', op('add', { text: 'A' }));
+  q = trans(q, 'queue', op('add', { text: 'B' }));
+  const [a, b] = q.items.map(item => item.id);
+  assert.throws(() => trans(q, 'queue', op('cancel-unsent', { id: a })));
+  q = trans(q, 'queue', op('sending', { id: a }));
+  assert.throws(() => trans(q, 'queue', op('cancel-unsent', { id: b })));
+  q = trans(q, 'queue', op('cancel-unsent', { id: a }));
+  assert.deepEqual(q.items.map(item => item.status), ['pending', 'pending']);
+  q = trans(q, 'queue', op('sending', { id: a }));
+  q = trans(q, 'queue', op('awaiting', { id: a }));
+  assert.throws(() => trans(q, 'queue', op('cancel-unsent', { id: a })));
+});

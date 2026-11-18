@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.16 — Recoverable Startup and Reopening
+# Queued for ChatGPT v1.2.17 — Safe Sequential Queue Continuation
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.16](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.16)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.17](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.17)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.17:** The queue waits for transient composer content to clear and requires an actually settled empty composer before sending. Persistent drafts are protected; a reservation invalidated before insertion returns to Pending. Uncertain sends still require manual review. No new permissions, storage schema changes or persistent polling.
 
 **New in v1.2.16:** Failed panel initialization releases its guard and retries once; toolbar and shortcut activation restore a detached panel without duplicating the instance. Interrupted per-tab shutdown recovery is retained. The close button still releases idle UI resources, and uncertain prompts remain paused for manual review. No new permissions, storage migrations, or continuous polling.
 
@@ -38,13 +40,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.16 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.16), expand **Assets**, and download **`queued-for-chatgpt-v1.2.16.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.17 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.17), expand **Assets**, and download **`queued-for-chatgpt-v1.2.17.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.16**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.17**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Click the **Queued for ChatGPT** toolbar icon or press the currently assigned shortcut (suggested **Alt+Shift+Q**). If the hotkey does nothing, open ⚙ Settings → Keyboard shortcut or `chrome://extensions/shortcuts` to check its assignment. Pin the extension in Chrome's toolbar for easier access.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -158,7 +160,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.16.zip`** from the [v1.2.16 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.16) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.17.zip`** from the [v1.2.17 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.17) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs. Queued will remain asleep until you use its toolbar icon or Alt+Shift+Q in each tab.
@@ -252,7 +254,7 @@ The extension uses the **notifications** permission alongside its existing **sto
 - Auto-send only runs while its ChatGPT tab remains available. A discarded tab may trigger a best-effort interruption alert, but closing the browser or suspending the extension can prevent notification delivery.
 - The extension does **not** treat a temporarily idle composer as proof of a completed response. Missing confirmation leads to a pause, not an automatic retry or duplicate send.
 - If an item is marked sending/awaiting, inspect ChatGPT before using **✓ Done** or **↺ Retry**. Retrying may duplicate a message already sent.
-- A composer draft that ChatGPT hasn't sent won't be overwritten. If an existing draft blocks sending, review it and the queued item before resuming.
+- The runner waits briefly for the composer to clear and settle. A persistent unsent draft is never overwritten; preserve or clear it manually, then select Start. If a send may already have been attempted, review it before using Done or Retry.
 - Queue limit: 100 prompts; workflow limit: 200 named workflows, maximum 100 steps per workflow. Prompt text and a single short completed-prompt preview per chat are stored in local Chrome extension storage and may contain sensitive data.
 - Under-25 MB incremental memory remains a target, not a measurement or guarantee; verify savings with Chrome Task Manager on your device.
 

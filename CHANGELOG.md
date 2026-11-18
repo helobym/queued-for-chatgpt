@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.17 (2026-11-19)
+
+- Wait briefly for transient composer text to clear, require actual elapsed idle settling time, and prioritize the real ChatGPT composer over generic editable fields.
+- Revalidate the composer after reserving the queue head; roll back only known-unsent reservations before insertion, retaining manual review for any uncertain send.
+- Apply the same preflight to existing chats and new-chat/Project handoffs; prevent overlapping runner restarts.
+- Expand coordinator and simulated-browser coverage for delayed composer clearing, real drafts, duplicate sends and reservation races; no new permissions or storage migrations.
+
 ## 1.2.16 (2026-11-18)
 
 - Release the content injection guard and partial UI resources on initialization failure, with one safe automatic retry.

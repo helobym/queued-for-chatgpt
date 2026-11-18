@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.16 — recoverable startup, close/reopen and idle-only auto turn-off. */
+/* Queued for ChatGPT v1.2.17 — safe composer settling and sequential queue recovery. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -350,7 +350,7 @@
       applyQueue(route, record);
       return record;
     } catch (error) {
-      if (['sending', 'awaiting', 'complete'].includes(type)) pause('Storage or queue state changed; review the chat before resuming.', 'interrupted', 'storage');
+      if (['sending', 'cancel-unsent', 'awaiting', 'complete'].includes(type)) pause('Storage or queue state changed; review the chat before resuming.', 'interrupted', 'storage');
       throw error;
     }
   }
@@ -1479,11 +1479,26 @@
   }
 
   // DOM detection is deliberately conservative: never call network endpoints or reuse credentials.
+  // Prefer the actual composer ID, then explicit composer markup. Never pick
+  // an unrelated message editor just because it is a visible textbox.
   function findEditor() {
-    const options = document.querySelectorAll('#prompt-textarea, [data-testid="composer-input"], [contenteditable="true"][role="textbox"], textarea[data-id="root"]');
-    for (const el of options) {
-      if (el.closest('#qfc-root') || !el.isConnected || el.getClientRects().length === 0) continue;
-      if (el.isContentEditable || el.matches('textarea')) return el;
+    const visible = el => !el.closest('#qfc-root, [inert], [aria-hidden="true"]') &&
+      el.isConnected && el.getClientRects().length &&
+      (el.isContentEditable || el.matches('textarea')) && composerArea(el);
+    const tiers = [
+      '#prompt-textarea',
+      '[data-testid="composer-input"], textarea[data-id="root"]',
+      '[contenteditable="true"][role="textbox"]'
+    ];
+    for (let i = 0; i < tiers.length; i++) {
+      const options = [...document.querySelectorAll(tiers[i])].filter(el => {
+        if (!visible(el)) return false;
+        if (i < 2) return true;
+        const area = composerArea(el);
+        return area.matches('[data-testid="composer"], [data-chatgpt-composer]') ||
+          Boolean(area.querySelector('[data-testid="send-button"], [data-testid="composer-submit-button"], ' + STOP_SELECTORS));
+      });
+      if (options.length) return options.length === 1 ? options[0] : null;
     }
     return null;
   }
@@ -1491,7 +1506,7 @@
     return editor ? (editor.matches('textarea') ? editor.value : (editor.innerText || '').replace(/\u200b/g, '')) : '';
   }
   function composerArea(editor) {
-    return editor?.closest('form') || editor?.closest('[data-testid="composer"]') || null;
+    return editor?.closest('form, [data-testid="composer"], [data-chatgpt-composer]') || null;
   }
   function findSendButton(editor) {
     const area = composerArea(editor);
@@ -1506,8 +1521,7 @@
     const candidates = explicit.length ? explicit : eligible('button[type="submit"]');
     return candidates.length === 1 ? candidates[0] : null;
   }
-  function isGenerating() {
-    const editor = findEditor();
+  function isGenerating(editor = findEditor()) {
     const area = composerArea(editor);
     if (!area) return false;
     if (area.querySelector(STOP_SELECTORS)) return true;
@@ -1565,33 +1579,75 @@
   function healthyRoute(route) {
     return state.running && state.route === route && isUsableRoute(route);
   }
+  // Mutation signals wake a check; they do not count as elapsed time.
+  // A stable real draft still pauses; transient content is never erased.
+  const COMPOSER_SETTLE_MS = 1400;
+  const COMPOSER_DRAFT_GRACE_MS = 3500;
   async function waitForComposerIdle(route, deadline) {
+    let previousEditor = null, emptySince = null, draftSince = null;
     while (healthyRoute(route) && Date.now() < deadline) {
       const editor = findEditor();
-      if (editor && !isGenerating()) {
-        if (C.normalize(editorText(editor))) { pause('ChatGPT has an unsent draft. Queue paused to protect it.', 'interrupted', 'composer'); return false; }
-        // Guard against a momentary stop-button disappearance during regeneration.
-        await signalOrTimeout(1400);
-        if (healthyRoute(route) && !isGenerating()) return true;
-      } else {
-        setStatus('Waiting for ChatGPT to finish…');
-        await signalOrTimeout(Math.min(5000, deadline - Date.now()));
+      const now = Date.now();
+      if (editor !== previousEditor) {
+        previousEditor = editor;
+        emptySince = draftSince = null;
       }
+      if (!editor || isGenerating(editor)) {
+        emptySince = draftSince = null;
+        if (state.status !== 'Waiting for ChatGPT to finish…') setStatus('Waiting for ChatGPT to finish…');
+      } else if (C.normalize(editorText(editor))) {
+        emptySince = null;
+        if (draftSince === null) draftSince = now;
+        if (now - draftSince >= COMPOSER_DRAFT_GRACE_MS) {
+          pause('ChatGPT has an unsent draft. Queue paused to protect it.', 'interrupted', 'composer');
+          return null;
+        }
+        if (state.status !== 'Waiting for ChatGPT composer to clear…') setStatus('Waiting for ChatGPT composer to clear…');
+      } else {
+        draftSince = null;
+        if (emptySince === null) emptySince = now;
+        if (now - emptySince >= COMPOSER_SETTLE_MS) return editor;
+        if (state.status !== 'Waiting for ChatGPT composer to settle…') setStatus('Waiting for ChatGPT composer to settle…');
+      }
+      await signalOrTimeout(Math.min(500, Math.max(0, deadline - Date.now())));
     }
-    if (state.running && Date.now() >= deadline) pause('ChatGPT did not become ready. Queue paused.', 'interrupted', 'composer');
-    return false;
+    if (healthyRoute(route)) pause('ChatGPT did not become ready. Queue paused.', 'interrupted', 'composer');
+    return null;
   }
-  async function sendMessage(text, route) {
-    const editor = findEditor();
-    if (!editor || !healthyRoute(route) || isGenerating()) return false;
-    if (C.normalize(editorText(editor))) { pause('Unsent ChatGPT draft detected. Queue paused.', 'interrupted', 'composer'); return false; }
+  // Reserve the head before writing. If the composer changes during storage,
+  // undo only a reservation we KNOW has not reached writeEditor.
+  async function prepareAndSend(item, route) {
+    const deadline = Date.now() + 10 * 60 * 1000;
+    while (healthyRoute(route) && Date.now() < deadline) {
+      const editor = await waitForComposerIdle(route, deadline);
+      if (!editor || !healthyRoute(route)) return null;
+      await queueOp('sending', { id: item.id }, route);
+      if (!healthyRoute(route) || findEditor() !== editor ||
+          isGenerating(editor) || C.normalize(editorText(editor))) {
+        await queueOp('cancel-unsent', { id: item.id }, route);
+        continue;
+      }
+      const userBaseline = snapshotUserTurns();
+      const oldAssistant = assistantMessages().at(-1);
+      const handoff = route.startsWith('new:') ? {
+        from: route, id: item.id, text: item.text, clickedAt: 0, destination: null
+      } : null;
+      if (handoff) newChatHandoff = handoff;
+      const clicked = await sendMessage(item.text, route, editor);
+      return { clicked, userBaseline, oldAssistant, handoff };
+    }
+    if (healthyRoute(route)) pause('ChatGPT did not become ready. Queue paused.', 'interrupted', 'composer');
+    return null;
+  }
+  async function sendMessage(text, route, editor) {
+    // No asynchronous gap between the caller's final preflight and insertion.
     if (!writeEditor(editor, text)) { pause('Composer changed; cannot safely insert prompt.', 'interrupted', 'composer'); return false; }
     const deadline = Date.now() + 3000;
     while (Date.now() < deadline && healthyRoute(route)) {
-      const button = findSendButton(editor);
+      const button = findEditor() === editor ? findSendButton(editor) : null;
       if (button && !button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
           !button.closest('[inert]') && C.normalize(editorText(editor)) === C.normalize(text) &&
-          !isGenerating()) {
+          !isGenerating(editor)) {
         // Record the intentional send before clicking: the site may update its URL immediately.
         if (newChatHandoff?.from === route) newChatHandoff.clickedAt = Date.now();
         // This is an attempt, not proof of acceptance. Receipt verification
@@ -1739,12 +1795,9 @@
         if (item.status !== 'pending') {
           pause('Review uncertain message. Use ✓ Done or ↺ Retry before resuming.', 'interrupted', 'send'); return;
         }
-        const idle = await waitForComposerIdle(route, Date.now() + 10 * 60 * 1000);
-        if (!idle || !healthyRoute(route)) return;
-        const userBaseline = snapshotUserTurns();
-        const oldAssistant = assistantMessages().at(-1);
-        await queueOp('sending', { id: item.id }, route); render();
-        const clicked = await sendMessage(item.text, route);
+        const attempt = await prepareAndSend(item, route);
+        if (!attempt) return;
+        const { clicked, userBaseline, oldAssistant } = attempt;
         if (!clicked) {
           // Never restore to pending automatically: editor text may have been inserted.
           if (state.running) pause('Send not confirmed. Check ChatGPT and resolve item manually.', 'interrupted', 'send');
@@ -1770,15 +1823,9 @@
     if (!first || first.status !== 'pending') {
       pause('Review the first queued prompt before starting.'); return;
     }
-    if (!await waitForComposerIdle(temporaryRoute, Date.now() + 10 * 60 * 1000)) return;
-    if (!healthyRoute(temporaryRoute)) return;
-    const previousUsers = snapshotUserTurns();
-    const previousAssistant = assistantMessages().at(-1);
-    await queueOp('sending', { id: first.id }, temporaryRoute);
-    newChatHandoff = { from: temporaryRoute, id: first.id, text: first.text,
-      clickedAt: 0, destination: null };
-    const handoff = newChatHandoff;
-    const clicked = await sendMessage(first.text, temporaryRoute);
+    const attempt = await prepareAndSend(first, temporaryRoute);
+    if (!attempt) return;
+    const { clicked, userBaseline: previousUsers, oldAssistant: previousAssistant, handoff } = attempt;
     if (!clicked) {
       if (state.running) pause('First send uncertain. Check the composer before retrying.', 'interrupted', 'send');
       return;
@@ -1833,6 +1880,7 @@
       if (workflowId) notify('This queue is already running. Pause it before starting a saved workflow.');
       return;
     }
+    if (runnerPromise) { notify('Previous queue is stopping. Select Start again when it is ready.'); return; }
     if (state.routeLoading || !state.storageHealthy) {
       if (workflowId) notify('The chat queue is not ready. Reload or try again.');
       return;

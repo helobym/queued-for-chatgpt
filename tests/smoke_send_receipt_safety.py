@@ -92,5 +92,74 @@ with sync_playwright() as p:
     assert page.locator('#prompt-textarea').inner_text().strip() == 'Repeat exactly this prompt'
     page.close()
 
-    print('PASS: repeated sends succeed; ignored click and DOM re-render never becomes awaiting')
+    # An unrelated textbox precedes the actual composer. Transient restored
+    # content after the first receipt must clear before the next send.
+    page = open_queue(browser)
+    page.evaluate("""() => {
+      const unrelated = document.createElement('div');
+      unrelated.contentEditable = 'true'; unrelated.setAttribute('role', 'textbox');
+      unrelated.textContent = 'Unrelated editable content';
+      unrelated.id = 'unrelated-editor'; document.body.prepend(unrelated);
+      const button = document.querySelector('[data-testid="send-button"]');
+      button.addEventListener('click', () => {
+        if (window.__sentCount !== 1) return;
+        setTimeout(() => {
+          const editor = document.querySelector('#prompt-textarea');
+          editor.textContent = 'Temporarily restored composer text';
+          setTimeout(() => { editor.textContent = ''; }, 3200);
+        }, 100);
+      });
+    }""")
+    add_duplicate_prompts(page)
+    page.locator('#qfc-start').click()
+    page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Waiting for ChatGPT composer to clear')", timeout=15000)
+    assert page.evaluate('window.__sentCount') == 1
+    page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Queue complete')", timeout=35000)
+    assert page.evaluate('window.__sentCount') == 2
+    assert page.locator('#unrelated-editor').inner_text() == 'Unrelated editable content'
+    page.close()
+
+    # A persistent actual draft is never erased or sent; clear it and restart.
+    page = open_queue(browser)
+    add_duplicate_prompts(page)
+    page.locator('#prompt-textarea').fill('My unsent draft')
+    page.locator('#qfc-start').click()
+    page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('unsent draft')", timeout=12000)
+    assert page.locator('#prompt-textarea').inner_text() == 'My unsent draft'
+    assert page.evaluate('window.__sentCount') == 0
+    assert 'Sending' not in page.locator('#qfc-queue-items').inner_text()
+    page.locator('#prompt-textarea').fill('')
+    page.locator('#qfc-start').click()
+    page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Queue complete')", timeout=35000)
+    assert page.evaluate('window.__sentCount') == 2
+    page.close()
+
+    # A draft appearing during storage reservation must not leave a false
+    # uncertain item: the runner has not yet attempted insertion.
+    page = open_queue(browser)
+    add_duplicate_prompts(page)
+    page.evaluate("""() => {
+      const original = chrome.runtime.sendMessage.bind(chrome.runtime);
+      let injected = false;
+      chrome.runtime.sendMessage = async msg => {
+        const result = await original(msg);
+        if (!injected && msg.command === 'queue' && msg.mutation.type === 'sending') {
+          injected = true;
+          document.querySelector('#prompt-textarea').textContent = 'Draft during reservation';
+        }
+        return result;
+      };
+    }""")
+    page.locator('#qfc-start').click()
+    page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('unsent draft')", timeout=12000)
+    assert page.evaluate('window.__sentCount') == 0
+    assert page.locator('#prompt-textarea').inner_text() == 'Draft during reservation'
+    assert 'Sending' not in page.locator('#qfc-queue-items').inner_text()
+    page.locator('#prompt-textarea').fill('')
+    page.locator('#qfc-start').click()
+    page.wait_for_function("document.querySelector('#qfc-status').textContent.includes('Queue complete')", timeout=35000)
+    assert page.evaluate('window.__sentCount') == 2
+    page.close()
+
+    print('PASS: repeated sends, ignored clicks, transient composer drafts, persistent drafts and reservation rollback')
     browser.close()
