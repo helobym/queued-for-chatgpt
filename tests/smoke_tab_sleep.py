@@ -95,11 +95,33 @@ with sync_playwright() as playwright:
         page.locator("#qfc-root").wait_for()
         assert page.locator("#qfc-panel").is_visible()
 
+    # Fail the first actual content startup and require recovery in the SAME
+    # toolbar activation. The old instance must release its guard and CSS.
+    page.evaluate("""() => {
+      const original = document.body.append;
+      document.body.append = function(...nodes) {
+        if (nodes.some(node => node?.id === 'qfc-root')) {
+          document.body.append = original;
+          throw new Error('Injected one-time startup failure');
+        }
+        return original.apply(this, nodes);
+      };
+    }""")
     activate()
+    assert page.locator("#qfc-root").count() == 1
+    assert page.evaluate("window.__removedCss") == 1
+    # A site DOM replacement must restore the same instance and unsaved text.
+    page.locator("#qfc-compose").fill("Draft survives detached panel")
+    page.evaluate("window.__oldQfcRoot = document.querySelector('#qfc-root'); window.__oldQfcRoot.remove()")
+    activate()
+    assert page.evaluate("document.querySelector('#qfc-root') === window.__oldQfcRoot")
+    assert page.locator("#qfc-compose").input_value() == "Draft survives detached panel"
+    page.locator("#qfc-compose").fill("")
+    page.evaluate("delete window.__oldQfcRoot")
     # An untouched active tab sleeps, disconnects its UI, and can be reactivated.
     page.wait_for_function("!document.querySelector('#qfc-root')", timeout=12000)
     assert page.evaluate("globalThis.__qfcContentLoaded") is False
-    assert page.evaluate("window.__removedCss") == 1
+    assert page.evaluate("window.__removedCss") == 2
 
     activate()
     page.locator("#qfc-compose").fill("Keep unsaved input in the editor")

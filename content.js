@@ -1,8 +1,7 @@
-/* Queued for ChatGPT v1.2.15 — recoverable close/reopen and idle-only auto turn-off. */
+/* Queued for ChatGPT v1.2.16 — recoverable startup, close/reopen and idle-only auto turn-off. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
-  globalThis.__qfcContentLoaded = true;
   const C = globalThis.QFC;
   const STORAGE = chrome.storage.local;
   // Recent ChatGPT app-shell renders messages under a timeline using search-unit
@@ -94,7 +93,7 @@
       C.normalize(root?.querySelector('#qfc-workflow-name')?.value));
   }
   function canSleep() {
-    return autoTurnOffMinutes > 0 && !disposed && !disposing &&
+    return initialized && autoTurnOffMinutes > 0 && !disposed && !disposing &&
       !state.running && !runnerPromise && !state.routeLoading && !uiOperations &&
       !notificationWriteLoop && !autoOffWriteLoop &&
       !pendingWorkflowLoads.size && !hasUnsavedInput() &&
@@ -489,6 +488,7 @@
   function initPanel() {
     root = document.createElement('div');
     root.id = 'qfc-root';
+    root.style.visibility = 'hidden'; // No user interaction before initialization finishes.
     root.innerHTML = `
       <button type="button" class="qfc-dock" data-action="toggle" aria-expanded="false" aria-controls="qfc-panel">☷ Queue<span id="qfc-dock-status"> · Loading</span><span id="qfc-dock-count"></span></button>
       <section class="qfc-panel" id="qfc-panel" aria-label="Queued for ChatGPT" hidden>
@@ -2083,13 +2083,37 @@
     chrome.storage.onChanged.addListener(onStorageChanged);
     cleanupListeners.push(() => chrome.storage.onChanged.removeListener?.(onStorageChanged));
     initialized = true;
+    root.style.visibility = '';
     queuedInteraction();
+  }
+  // A startup failure must not leave a guarded, invisible instance behind.
+  // Do not use sleepTab here: its tabSleep RPC waits on the same worker task
+  // that is awaiting this initialization. No runner can start before readiness.
+  function failedInitialization(error) {
+    disposed = true;
+    initialized = false;
+    routeLoadGeneration++; // Ignore any in-flight startup route read.
+    clearIdleTimer();
+    if (routeTimer) clearTimeout(routeTimer);
+    routeTimer = null;
+    for (const timer of transientTimers) clearTimeout(timer);
+    transientTimers.clear();
+    try { pageObserver?.disconnect(); } catch (_) {}
+    for (const cleanup of cleanupListeners.splice(0)) {
+      try { cleanup(); } catch (_) {}
+    }
+    try { root?.remove(); } catch (_) {}
+    root = queueList = workflowsList = statusLine = queueTextArea = workflowSearch = null;
+    globalThis.__qfcContentLoaded = false;
+    console.warn('[Queued for ChatGPT] Panel initialization failed.', error);
+    return false;
   }
   function onUiMessage(message, sender, sendResponse) {
     if (sender?.id !== chrome.runtime.id || message?.app !== 'qfc-ui-v1') return false;
     if (message.action === 'status') {
       sendResponse({
-        active: !disposed && !disposing && Boolean(root?.isConnected),
+        active: !disposed && !disposing,
+        attached: Boolean(root?.isConnected),
         closing: disposing && !disposed,
         ready: initialized,
         open: state.open,
@@ -2100,8 +2124,19 @@
     if (message.action !== 'open-panel' && message.action !== 'toggle-panel') return false;
     void Promise.resolve(initializationReady).then(() => {
       if (disposed || disposing || !root) return { active: false };
-      if (message.action === 'toggle-panel') togglePanel();
-      else if (!state.open) {
+      // The site may replace its DOM while this instance is still alive.
+      // Reattach the same panel (and its draft/runner), never inject a second one.
+      const detached = !root.isConnected;
+      if (detached) {
+        if (!document.body) return { active: false };
+        document.body.append(root);
+        if (pageObserver) {
+          pageObserver.disconnect();
+          pageObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
+        }
+      }
+      if (message.action === 'toggle-panel' && !detached) togglePanel();
+      else if (!state.open || detached) {
         state.open = true;
         render();
         setPanelPosition(panelOffsetX, panelOffsetY, { save: true });
@@ -2111,9 +2146,19 @@
     }).then(sendResponse, () => sendResponse({ active: false }));
     return true;
   }
-  chrome.runtime.onMessage.addListener(onUiMessage);
-  cleanupListeners.push(() => chrome.runtime.onMessage.removeListener?.(onUiMessage));
-  if (document.body) initializationReady = initialize();
-  else initializationReady = new Promise(resolve => document.addEventListener(
-    'DOMContentLoaded', () => resolve(initialize()), { once: true }));
+  // Claim the guard only once synchronous setup is complete and ensure every
+  // asynchronous initialization rejection releases it before the worker retries.
+  globalThis.__qfcContentLoaded = true;
+  try {
+    chrome.runtime.onMessage.addListener(onUiMessage);
+    cleanupListeners.push(() => chrome.runtime.onMessage.removeListener?.(onUiMessage));
+    if (document.body) initializationReady = initialize().catch(failedInitialization);
+    else initializationReady = new Promise(resolve => {
+      const ready = () => resolve(initialize());
+      document.addEventListener('DOMContentLoaded', ready, { once: true });
+      cleanupListeners.push(() => document.removeEventListener('DOMContentLoaded', ready));
+    }).catch(failedInitialization);
+  } catch (error) {
+    failedInitialization(error);
+  }
 })();

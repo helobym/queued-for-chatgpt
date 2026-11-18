@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.16 (2026-11-18)
+
+- Release the content injection guard and partial UI resources on initialization failure, with one safe automatic retry.
+- Restore a detached floating panel in the same instance, preserving drafts and running queues.
+- Prevent auto-sleep before startup finishes; retain close/reopen safety and all saved data.
+- Add simulated browser coverage for startup failure and detached panel recovery.
+
 ## 1.2.15 (2026-11-11)
 
 - Recovered toolbar and shortcut activation when a prior shutdown acknowledgment was lost or its closing marker became stale.

@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.15 — on-demand activation, recoverable shutdown and notifications. */
+/* Queued for ChatGPT v1.2.16 — on-demand activation, recoverable startup and shutdown. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;
@@ -400,7 +400,10 @@ async function openOrToggleTab(tab) {
       // A previous shutdown record is stale when a live instance answers.
       closingTabs.delete(tab.id);
       let toggled = null;
-      try { toggled = await sendUi(tab.id, 'toggle-panel'); } catch (_) {}
+      try {
+        const action = status.attached === false || status.ready === false ? 'open-panel' : 'toggle-panel';
+        toggled = await sendUi(tab.id, action);
+      } catch (_) {}
       if (toggled?.active) return;
       // Do not blindly toggle again: the first toggle might have succeeded.
       try { status = await sendUi(tab.id, 'status'); } catch (_) { status = null; }
@@ -418,19 +421,33 @@ async function openOrToggleTab(tab) {
       return;
     }
     closingTabs.delete(tab.id);
-    await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        files: ['core.js', 'content.js']
-      });
-      const opened = await sendUi(tab.id, 'open-panel');
-      if (!opened?.active) throw new Error('Queued did not initialize in this tab.');
-    } catch (error) {
+    // Retry a failed startup once, only after the prior instance has released
+    // its guard. Never clear a live instance's guard or retry a running queue.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await chrome.scripting.insertCSS({ target: { tabId: tab.id }, files: ['content.css'] });
       try {
-        await chrome.scripting.removeCSS({ target: { tabId: tab.id }, files: ['content.css'] });
-      } catch (_) { /* Navigation can invalidate the CSS target. */ }
-      throw error;
+        await chrome.scripting.executeScript({
+          target: { tabId: tab.id },
+          files: ['core.js', 'content.js']
+        });
+        const opened = await sendUi(tab.id, 'open-panel');
+        if (!opened?.active) throw new Error('Queued did not initialize in this tab.');
+        return;
+      } catch (error) {
+        // A lost response is not proof of failure. Keep CSS on a live instance.
+        const guarded = await contentGuardActive(tab.id).catch(() => null);
+        if (guarded === true) {
+          let live = null;
+          try { live = await sendUi(tab.id, 'status'); } catch (_) {}
+          if (live?.active || live?.closing) return;
+          // Preserve the existing shutdown safety; never reinject over a guard.
+          // An unresponsive receiver still needs its existing CSS cleaned up.
+        }
+        try {
+          await chrome.scripting.removeCSS({ target: { tabId: tab.id }, files: ['content.css'] });
+        } catch (_) { /* Navigation can invalidate the CSS target. */ }
+        if (attempt || guarded !== false) throw error;
+      }
     }
   });
 }
