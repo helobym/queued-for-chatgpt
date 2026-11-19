@@ -1,38 +1,26 @@
-QUEUED FOR CHATGPT — v1.2.16 to v1.2.17
+QUEUED FOR CHATGPT — Upgrade to v1.2.18
 
-[ ] Allow active workflows to finish or pause and review uncertain sending/awaiting prompts.
-[ ] Export important Saved Workflows (v1.2.12 JSON backups also include all settings).
-[ ] Keep the SAME installed folder and extension ID: do not uninstall or load a second copy.
-[ ] Download queued-for-chatgpt-v1.2.17.zip from GitHub Release v1.2.17 and extract it.
-[ ] Replace extension files in the existing folder, keeping the original extension directory.
-[ ] Open chrome://extensions, Reload the existing Queued extension and verify v1.2.17.
-[ ] Refresh your ChatGPT tabs, then activate Queued from the Chrome toolbar or Alt+Shift+Q.
-[ ] Verify header order: Settings, Reset position, − minimize, ✕ close/turn off.
-[ ] Verify − and ✕ use matching neutral backgrounds, colors and bold text in light/dark mode.
-[ ] Verify the header's − button minimizes only to the compact live Queue dock.
-[ ] Verify ✕ turns Queued off in that tab; reopen using both the Chrome toolbar and the assigned shortcut.
-[ ] Verify opening from a fresh ChatGPT tab and reopening after a temporary startup failure.
-[ ] Verify repeated clicks during shutdown do not create duplicate panels or running queues.
-[ ] Open ⚙ Settings and verify auto turn-off defaults to 5 minutes after upgrade.
-[ ] Change auto turn-off to Never and verify it does not sleep while idle.
-[ ] Choose 1, 10, 15, 30 or 60 minutes and verify the choice is saved and shared between tabs.
-[ ] Verify active runs, unsaved edits and unfinished saves prevent automatic sleep.
-[ ] Open Settings → Keyboard shortcut: verify Chrome's actual assignment, Refresh, and Change in Chrome.
-[ ] Confirm the hotkey minimizes, restores, and reopens Queued without interrupting running prompts.
-[ ] Confirm auto turn-off starts a FULL fresh idle countdown after a long workflow finishes.
-[ ] Confirm uncertain sending/awaiting prompts do not auto turn off before review.
-[ ] Verify notification switches, sound, volume, duration, and visibility are unchanged.
-[ ] Export workflows + settings JSON. Check the backup contains autoTurnOffMinutes and notificationSettings.
-[ ] Import a version 4 JSON backup; approve the settings restore and verify values.
-[ ] Import a previous version 3 workflow-only backup; existing settings must remain unchanged.
-[ ] Reject an invalid settings backup without importing its workflows.
-[ ] Verify Run/Load/Copy, recent activity, New Chat/Project routes and safe uncertain-response handling.
-[ ] Run a multi-step workflow: the next prompt should send after the composer settles; an actual unsent draft must remain untouched and pause the queue.
-[ ] Compare active and idle memory on ChromeOS if desired; browser reclamation is not guaranteed.
+[ ] Finish active workflows or pause and review uncertain prompts.
+[ ] Export important Saved Workflows and keep the JSON backup somewhere safe.
+[ ] Keep the SAME installed extension folder and extension ID. Do not uninstall first.
+[ ] Download queued-for-chatgpt-v1.2.18.zip from GitHub Release v1.2.18 and extract it.
+[ ] Replace the old extension files in that SAME folder. Older offscreen.html / offscreen.js files can be removed; they are no longer used.
+[ ] Open chrome://extensions, Reload the existing extension, and verify v1.2.18.
+[ ] Refresh ChatGPT tabs and open the panel using toolbar or Alt+Shift+Q.
+[ ] Confirm Settings shows keyboard shortcut and idle turn-off only (no desktop notification settings).
+[ ] Verify idle turn-off options, Never, and safe no-sleep behavior during active/uncertain prompts.
+[ ] Verify all saved workflows and pending queues remain intact.
+[ ] Export JSON and verify backup version 5 includes workflows and settings.autoTurnOffMinutes, without notificationSettings.
+[ ] Import an older v4 workflow/settings backup. Confirm only idle timeout settings are restored.
+[ ] Import an older v3 workflow-only backup. Confirm existing idle settings are preserved.
+[ ] Test Add/Start/Pause/Load/Copy, New Chat/Project navigation, and manual Done/Retry recovery.
+[ ] Run two prompts sequentially and verify the second is sent only after the first reply and composer settle.
+[ ] Verify persistent drafts are protected and manual Stop does not trigger another prompt.
+[ ] Compare CPU/RAM with earlier builds if desired; real-world savings are not guaranteed.
 
 IMPORTANT:
-- Do not change the installed extension ID; old local queues and saved workflows depend on it.
-- Version 4 exports include FULL stored workflow prompts and settings. Handle JSON backup files privately.
-- Per-chat queues, current in-flight state, and previously completed prompt previews are not in workflow JSON exports.
 - Unpacked extensions do not update automatically from GitHub.
-- No permanent background polling, third-party dependencies, or extra permissions are added.
+- Preserve the original installed folder/extension ID to retain access to local data.
+- JSON backups contain FULL saved workflow prompts. Store them privately.
+- Version 4 backup notification preferences are no longer applied.
+- Desktop notifications, offscreen audio, and both Chrome permissions have been removed.

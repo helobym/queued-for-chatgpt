@@ -1,13 +1,13 @@
 # Privacy Policy — Queued for ChatGPT
 
-**Last updated:** 8 November 2026  
+**Last updated:** 19 November 2026  
 **Publisher:** Helobym Networking (Malaysia)
 
 Queued for ChatGPT is a browser extension that helps users save prompt workflows and send queued prompts through ChatGPT. It is an independent project and is not affiliated with OpenAI.
 
 ## What the extension stores
 
-The extension stores queued prompts, saved workflows, queue status, conversation identifiers, and interface preferences in Chrome's local extension storage. It also keeps one short preview (up to 160 characters) of the most recently confirmed completed queued prompt per conversation, plus its completion time and workflow origin when available. This is not a full prompt or response history. It may also keep temporary chat identifiers and the floating panel position in the tab's session storage. Workflow expansion and the local dock-running indicator are kept only in the current page's memory and are not added to saved queue records. Per-tab activation and safe idle sleep do not change or erase stored queues, saved workflows, or notification preferences. The automatic turn-off duration (including Never) is saved in the existing local settings record and shared between active tabs. Notification preferences (enabled alerts, selected sound, sound duration, volume, and visibility) are stored separately in Chrome's local extension storage and synchronized between extension tabs. Notification delivery also retains a small active-run identifier, originating tab ID, start time and short workflow name in Chrome's session-scoped extension storage; it is cleared when the run ends or the tab closes. No full prompts or assistant replies are added to notification records. Older versions' Favorites data may remain locally for backup.
+The extension stores queued prompts, saved workflows, queue status, conversation identifiers, and interface preferences in Chrome's local extension storage. It also retains one short preview (up to 160 characters) of the most recently verified completed prompt per conversation, its completion time, and workflow origin when available. It may retain temporary conversation identifiers and panel positioning in tab-local storage. The idle turn-off duration is shared between active tabs. Earlier versions stored desktop-notification preferences and short-lived notification run metadata; v1.2.18 no longer reads, updates, or uses these historical records. Older Favorites records may remain stored for backup. The extension does not create a separate assistant-response archive.
 
 This information stays in your browser profile. **Helobym Networking does not operate a server that receives it.** The extension does not use advertising trackers, analytics, or telemetry.
 
@@ -17,7 +17,7 @@ When you click **Start** or **Start Workflow**, the extension submits your selec
 
 Clicking **Copy** on a queued prompt or an individual saved workflow step places that prompt's full text on your device's clipboard. Copy does not send the prompt to ChatGPT or to Helobym Networking. Clipboard contents may be accessible to other applications on your device.
 
-When a run finishes or automatically stops, the extension can display a Chrome desktop notification with a bounded workflow name, outcome and verified prompt count or failure reason. Chrome/your operating system may show this text on screen, including a lock screen. Manual Pause and deliberate Stop do not trigger the alert. Tab discard notifications are best effort, not a guarantee of recovery. When a user selects a custom notification sound, an audio-only offscreen extension document generates short original tones locally using Web Audio, for a bounded duration. Sound commands do not contain full prompts or responses, and no sound files are downloaded or uploaded. Chrome and the operating system may block sound or notification display.
+Version 1.2.18 no longer shows desktop notifications or plays custom notification sounds. Workflow status and safety warnings remain visible in the extension panel.
 
 Prompt content submitted to ChatGPT is processed by OpenAI under its own terms and privacy policy. Helobym Networking does not control how OpenAI processes that content.
 
@@ -25,11 +25,11 @@ Prompt content submitted to ChatGPT is processed by OpenAI under its own terms a
 
 The extension does not sell or share your stored prompts with Helobym Networking or third-party advertisers. It sends prompts to ChatGPT only as part of the sending feature you activate.
 
-You can remove queued prompts and saved workflows within the extension. **Clear** removes pending queue items but keeps the most recently completed prompt preview; to remove that saved preview and other local extension data, uninstall the extension (which normally removes its local extension storage). New workflow JSON exports contain the full saved workflow prompt text and your auto-turn-off and notification settings. Importing these settings requires your confirmation and updates preferences across active tabs; older workflow-only backups do not change settings. Exported JSON files remain wherever you saved them until you delete them yourself. Old Favorites exports remain separate.
+You can remove queued prompts and saved workflows within the extension. **Clear** removes pending queue items but keeps the most recently completed prompt preview; to remove that saved preview and other local extension data, uninstall the extension (which normally removes its local extension storage). New version 5 workflow JSON exports contain the full saved workflow prompt text and your automatic idle turn-off duration. Older version 4 backups with notification settings remain importable; notification preferences are validated but not restored. Importing these settings requires your confirmation and updates preferences across active tabs; older workflow-only backups do not change settings. Exported JSON files remain wherever you saved them until you delete them yourself. Old Favorites exports remain separate.
 
 ## Permissions
 
-The extension requests Chrome's **storage**, **notifications**, **offscreen**, **activeTab**, and **scripting** permissions. The latter two allow an explicit toolbar click or keyboard shortcut to inject the Queue panel into the selected **https://chatgpt.com/** tab; it is not injected automatically into all pages. The offscreen permission is used only for optional local sound playback without opening a visible tab. It does not request access to your passwords, contacts, or general browsing history.
+The extension requests Chrome's **storage**, **activeTab**, and **scripting** permissions. The latter two allow an explicit toolbar click or keyboard shortcut to inject the Queue panel into the selected **https://chatgpt.com/** tab; it is not injected automatically into all pages. It does not request access to your passwords, contacts, or general browsing history.
 
 ## Questions
 
