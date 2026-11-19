@@ -139,10 +139,10 @@ with sync_playwright() as playwright:
     page.locator('[data-action="save-workflow-edit"]').click()
     page.locator("#qfc-workflow-items").get_by_text("Persistent workflow").wait_for()
     page.locator('[data-action="open-settings"]').click()
-    page.locator("#qfc-notify-interrupted").uncheck()
+    page.locator("#qfc-auto-turn-off").select_option("10")
     page.wait_for_function("""async()=>{
-      const s=await chrome.storage.local.get('qfc_v1_notification_settings');
-      return s.qfc_v1_notification_settings?.onInterrupted===false;
+      const s=(await chrome.storage.local.get('qfc_v1_settings')).qfc_v1_settings;
+      return s?.autoTurnOffMinutes===10;
     }""")
     # The power button turns off just this instance without deleting stored data.
     page.locator('[data-action="turn-off"]').click()
@@ -151,7 +151,7 @@ with sync_playwright() as playwright:
     page.locator('[data-action="tab-workflows"]').click()
     page.locator("#qfc-workflow-items").get_by_text("Persistent workflow").wait_for()
     page.locator('[data-action="open-settings"]').click()
-    assert not page.locator("#qfc-notify-interrupted").is_checked()
+    assert page.locator("#qfc-auto-turn-off").input_value() == "10"
 
     # Manual OFF during a run must pause safely without false terminal success.
     page.locator('[data-action="settings-back"]').click()
