@@ -1,3 +1,9 @@
+# v1.2.18
+
+- Coalesce DOM-triggered runner wakeups during streaming; defer full response extraction until generation stops.
+- Remove desktop notifications, custom audio, offscreen document, and their Chrome permissions.
+- Export v5 workflow and idle-timeout backups. Continue importing v3 and v4 backups without restoring removed notification settings.
+
 # Changelog
 
 ## 1.2.17 (2026-11-19)

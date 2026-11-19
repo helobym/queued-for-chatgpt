@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.17 — safe composer settling and sequential queue recovery. */
+/* Queued for ChatGPT v1.2.18 — safe composer settling and sequential queue recovery. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -41,7 +41,7 @@
     routeLoading: false, storageHealthy: true
   };
   let root, queueList, workflowsList, statusLine, queueTextArea, workflowSearch;
-  let pageObserver, routeTimer, lastAssistantChange = Date.now();
+  let pageObserver, routeTimer, domWakeTimer = null, lastAssistantChange = Date.now();
   let routeLoadGeneration = 0;
   let trackingSendAttempt = false, observedStopDuringSend = false;
   let lastPathname = location.pathname;
@@ -64,12 +64,6 @@
   // Settings is a view within the floating window, not a new browser tab.
   // Saved workflow expansion and selected Queue/Workflows tab remain untouched.
   let settingsOpen = false;
-  let notificationSettings = C.cleanNotificationSettings();
-  let confirmedNotificationSettings = notificationSettings;
-  let customSecondsDraft = '10';
-  let settingsRevision = 0, savedSettingsRevision = 0;
-  let notificationWriteLoop = null;
-  let notificationSaveStatus = 'Ready';
   const IDLE_SLEEP_SCALE_MS = 60 * 1000;
   let autoTurnOffMinutes = C.DEFAULT_AUTO_TURN_OFF_MINUTES;
   let confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
@@ -78,7 +72,7 @@
   let idleTimer = null, idleSince = null;
   let shortcutInfo = { status: 'unknown', value: '' }, shortcutRequest = 0;
   let disposing = false, disposed = false, initialized = false;
-  let initializationReady = null, runnerPromise = null, terminalEventPromise = null;
+  let initializationReady = null, runnerPromise = null;
   let uiOperations = 0;
   const cleanupListeners = [];
   const transientTimers = new Set();
@@ -95,7 +89,7 @@
   function canSleep() {
     return initialized && autoTurnOffMinutes > 0 && !disposed && !disposing &&
       !state.running && !runnerPromise && !state.routeLoading && !uiOperations &&
-      !notificationWriteLoop && !autoOffWriteLoop &&
+      !autoOffWriteLoop &&
       !pendingWorkflowLoads.size && !hasUnsavedInput() &&
       !state.queue.some(item => item.status !== 'pending');
   }
@@ -172,85 +166,20 @@
 
   // Persist at most one settings record at a time; coalesce rapid changes and
   // avoid newer local selections being replaced by stale storage events.
-  async function persistNotificationSettings() {
-    if (notificationWriteLoop) return notificationWriteLoop;
-    const loop = (async () => {
-      while (savedSettingsRevision < settingsRevision) {
-        const revision = settingsRevision;
-        const snapshot = notificationSettings;
-        try {
-          await STORAGE.set({ [C.NOTIFICATION_SETTINGS_KEY]: snapshot });
-          confirmedNotificationSettings = snapshot;
-          savedSettingsRevision = revision;
-        } catch (_) {
-          notificationSettings = confirmedNotificationSettings;
-          savedSettingsRevision = settingsRevision;
-          notificationSaveStatus = 'Save failed — previous settings restored.';
-          renderNotificationSettings();
-          return;
-        }
-      }
-      notificationSaveStatus = 'Saved';
-      renderNotificationSettings();
-    })();
-    notificationWriteLoop = loop;
-    try { await loop; }
-    finally {
-      notificationWriteLoop = null;
-      if (savedSettingsRevision < settingsRevision) void persistNotificationSettings();
-      else scheduleIdleSleep();
-    }
-  }
-  function saveNotificationSettings(next) {
-    const previous = notificationSettings;
-    notificationSettings = C.cleanNotificationSettings(next);
-    settingsRevision++;
-    notificationSaveStatus = 'Saving…';
-    renderNotificationSettings();
-    // Switching notifications off, choosing Silent/System, or setting volume
-    // to zero should also stop an already-active custom sound.
-    const stopSound = (previous.enabled && !notificationSettings.enabled) ||
-      (['soft', 'double', 'alert'].includes(previous.sound) &&
-       !['soft', 'double', 'alert'].includes(notificationSettings.sound)) ||
-      (previous.soundVolume > 0 && notificationSettings.soundVolume === 0);
-    if (stopSound) void rpc('stopSound').catch(() => {});
-    void persistNotificationSettings();
-  }
-  // Page-local execution session. Never persist full prompts or responses.
-  let activeRun = null;
-  function runEvent(run, action, reason = 'unexpected') {
-    // Delivery is best-effort and must not change sender/queue behavior.
-    return chrome.runtime.sendMessage({
-      app: 'qfc-v1.1', command: 'runLifecycle', action,
-      runId: run.id, verifiedCount: run.verifiedCount,
-      workflowName: run.mixed ? '' : run.workflowName,
-      reason: action === 'interrupted' ? reason : undefined
-    }).catch(() => {});
-  }
-  async function beginRun() {
-    const origin = state.queue[0]?.workflow;
-    const workflowId = origin?.id || null;
-    const mixed = state.queue.some(item => (item.workflow?.id || null) !== workflowId);
-    const run = {
-      id: makeOperationId(), verifiedCount: 0,
-      workflowId, workflowName: mixed ? '' : (origin?.name || ''), mixed
-    };
-    activeRun = run;
-    // Wait for registration so even the fastest run has a registered owner.
-    // Failure to register does not block the sender.
-    await runEvent(run, 'start');
-  }
-  function recordVerified(item) {
-    if (!activeRun) return;
-    activeRun.verifiedCount++;
-    if ((item.workflow?.id || null) !== activeRun.workflowId) {
-      activeRun.mixed = true;
-      activeRun.workflowName = '';
-    }
-  }
-
   function wake() {
     for (const fn of Array.from(signalListeners)) fn();
+  }
+  // Coalesce DOM-triggered wakes; manual actions and storage events stay immediate.
+  function queueDomWake() {
+    if (domWakeTimer !== null || !signalListeners.size) return;
+    domWakeTimer = setTimeout(() => {
+      domWakeTimer = null;
+      if (!disposed && !disposing) wake();
+    }, 200);
+  }
+  function clearDomWake() {
+    if (domWakeTimer !== null) clearTimeout(domWakeTimer);
+    domWakeTimer = null;
   }
   function signalOrTimeout(ms) {
     return new Promise(resolve => {
@@ -591,62 +520,6 @@
           </select>
           <p class="qfc-settings-help" id="qfc-auto-turn-off-help">The full countdown begins after a run finishes and its sender lock is released. Running or uncertain prompts, unsaved edits and unfinished saves prevent automatic turn-off.</p>
           <p class="qfc-settings-feedback" id="qfc-auto-turn-off-status" role="status" aria-live="polite">Ready</p>
-          <div class="qfc-settings-divider"></div>
-          <strong class="qfc-settings-subtitle">Desktop notifications</strong>
-          <label class="qfc-setting-row" for="qfc-notify-enabled">
-            <span class="qfc-setting-copy"><strong>Desktop notifications</strong><small>Allow completion and automatic-stop alerts</small></span>
-            <span class="qfc-switch-wrap"><span class="qfc-switch-state" id="qfc-notify-enabled-state">ON</span>
-              <input type="checkbox" class="qfc-switch-input" id="qfc-notify-enabled" data-notification-setting="enabled">
-              <span class="qfc-switch-track" aria-hidden="true"></span></span>
-          </label>
-          <label class="qfc-setting-row" for="qfc-notify-success">
-            <span class="qfc-setting-copy"><strong>Workflow completed</strong><small>When all queued prompts finish</small></span>
-            <span class="qfc-switch-wrap"><span class="qfc-switch-state" id="qfc-notify-success-state">ON</span>
-              <input type="checkbox" class="qfc-switch-input" id="qfc-notify-success" data-notification-setting="onSuccess">
-              <span class="qfc-switch-track" aria-hidden="true"></span></span>
-          </label>
-          <label class="qfc-setting-row" for="qfc-notify-interrupted">
-            <span class="qfc-setting-copy"><strong>Stopped automatically</strong><small>When a run requires your attention</small></span>
-            <span class="qfc-switch-wrap"><span class="qfc-switch-state" id="qfc-notify-interrupted-state">ON</span>
-              <input type="checkbox" class="qfc-switch-input" id="qfc-notify-interrupted" data-notification-setting="onInterrupted">
-              <span class="qfc-switch-track" aria-hidden="true"></span></span>
-          </label>
-          <p class="qfc-settings-feedback" id="qfc-settings-save-status" role="status" aria-live="polite">Ready</p>
-          <label class="qfc-label" for="qfc-notify-sound">Notification sound</label>
-          <select id="qfc-notify-sound" data-notification-setting="sound">
-            <option value="system">System default</option>
-            <option value="soft">Soft Chime</option>
-            <option value="double">Double Chime</option>
-            <option value="alert">Alert Beep</option>
-            <option value="silent">Silent</option>
-          </select>
-          <label class="qfc-label" for="qfc-notify-duration-mode">Custom sound duration</label>
-          <select id="qfc-notify-duration-mode">
-            <option value="once">Play once</option>
-            <option value="timed">Custom duration</option>
-          </select>
-          <div class="qfc-setting-inline">
-            <input type="number" id="qfc-notify-duration" min="1" max="60" step="1" inputmode="numeric" value="10" aria-label="Custom sound duration in seconds">
-            <span>seconds (1–60)</span>
-          </div>
-          <label class="qfc-label" for="qfc-notify-volume">Custom sound volume</label>
-          <div class="qfc-setting-inline">
-            <input type="range" min="0" max="100" step="5" id="qfc-notify-volume" data-notification-setting="soundVolume">
-            <output id="qfc-notify-volume-value" for="qfc-notify-volume">75%</output>
-          </div>
-          <p class="qfc-settings-help">Volume changes only the custom chimes, not system notification audio.</p>
-          <label class="qfc-label" for="qfc-notify-visibility">Notification visibility</label>
-          <select id="qfc-notify-visibility" data-notification-setting="visibility">
-            <option value="system">System default</option>
-            <option value="persistent">Until dismissed (where supported)</option>
-          </select>
-          <div class="qfc-settings-tests">
-            <button type="button" class="qfc-small" data-action="test-notification-sound" id="qfc-test-sound">▶ Test sound (2s)</button>
-            <button type="button" class="qfc-small" data-action="test-desktop-notification" id="qfc-test-notification">Test notification</button>
-          </div>
-          <p class="qfc-settings-help" id="qfc-notify-preview" role="status" aria-live="polite"></p>
-          <p class="qfc-settings-help" id="qfc-notify-permission" role="status">Checking Chrome notification permission…</p>
-          <p class="qfc-settings-help">Sound duration affects only custom audio, not popup visibility. ChromeOS may suppress notifications or sound.</p>
         </div>
         <footer id="qfc-status" role="status">Paused</footer>
       </section>`;
@@ -682,37 +555,8 @@
         saveAutoTurnOffMinutes(Number(target.value));
         return;
       }
-      if (target.id === 'qfc-notify-duration-mode') {
-        if (target.value === 'once' && notificationSettings.soundDuration !== 'once')
-          customSecondsDraft = notificationSettings.soundDuration;
-        const duration = target.value === 'once' ? 'once' : customSecondsDraft;
-        if (C.validSoundDuration(duration)) {
-          saveNotificationSettings({ ...notificationSettings, soundDuration: duration });
-        }
-        return;
-      }
-      if (target.id === 'qfc-notify-duration') {
-        const duration = target.value.trim();
-        if (duration === 'once' || !C.validSoundDuration(duration)) {
-          notificationSaveStatus = 'Enter a whole number from 1 to 60 seconds.';
-          renderNotificationSettings();
-          return;
-        }
-        customSecondsDraft = duration;
-        saveNotificationSettings({ ...notificationSettings, soundDuration: duration });
-        return;
-      }
-      const key = target.dataset?.notificationSetting;
-      if (!key || !(key in C.DEFAULT_NOTIFICATION_SETTINGS)) return;
-      const value = target.type === 'checkbox' ? target.checked
-        : target.type === 'range' ? Number(target.value) : target.value;
-      saveNotificationSettings({ ...notificationSettings, [key]: value });
     });
     root.addEventListener('input', event => {
-      if (event.target.id === 'qfc-notify-volume') {
-        root.querySelector('#qfc-notify-volume-value').textContent = event.target.value + '%';
-        return;
-      }
       const draft = state.workflowDraft;
       if (!draft) return;
       if (event.target.id === 'qfc-edit-workflow-name') draft.name = event.target.value;
@@ -867,50 +711,7 @@
     }
     renderShortcut();
   }
-  function renderNotificationSettings() {
-    if (!root) return;
-    renderAutoTurnOffSetting();
-    const values = notificationSettings;
-    const custom = ['soft', 'double', 'alert'].includes(values.sound);
-    for (const control of root.querySelectorAll('[data-notification-setting]')) {
-      const value = values[control.dataset.notificationSetting];
-      if (control.type === 'checkbox') {
-        control.checked = Boolean(value);
-        const stateLabel = root.querySelector('#' + control.id + '-state');
-        if (stateLabel) stateLabel.textContent = value ? 'ON' : 'OFF';
-      } else control.value = value;
-      control.disabled = control.id !== 'qfc-notify-enabled' && !values.enabled;
-    }
-    if (values.soundDuration !== 'once') customSecondsDraft = values.soundDuration;
-    const mode = root.querySelector('#qfc-notify-duration-mode');
-    mode.value = values.soundDuration === 'once' ? 'once' : 'timed';
-    mode.disabled = !values.enabled || !custom;
-    const duration = root.querySelector('#qfc-notify-duration');
-    duration.value = values.soundDuration === 'once' ? customSecondsDraft : values.soundDuration;
-    duration.disabled = !values.enabled || !custom || values.soundDuration === 'once';
-    root.querySelector('#qfc-notify-volume').disabled = !values.enabled || !custom;
-    root.querySelector('#qfc-notify-volume-value').textContent = values.soundVolume + '%';
-    root.querySelector('#qfc-test-sound').disabled = !values.enabled || !custom || values.soundVolume === 0;
-    root.querySelector('#qfc-test-notification').disabled = !values.enabled;
-    const feedback = root.querySelector('#qfc-settings-save-status');
-    feedback.textContent = notificationSaveStatus;
-    feedback.dataset.state = notificationSaveStatus.startsWith('Save failed') ? 'error'
-      : notificationSaveStatus === 'Saved' ? 'saved' : 'neutral';
-  }
-  async function updateNotificationPermission() {
-    const info = root?.querySelector('#qfc-notify-permission');
-    if (!info) return;
-    try {
-      const level = await rpc('notificationPermission');
-      if (!settingsOpen) return;
-      info.textContent = level === 'granted'
-        ? 'Chrome notifications: allowed. OS settings may still mute or hide alerts.'
-        : level === 'denied' ? 'Chrome notifications: blocked. Allow them in browser settings.'
-          : 'Chrome notification permission unavailable; check browser settings.';
-    } catch (_) {
-      if (settingsOpen) info.textContent = 'Notification permission could not be checked.';
-    }
-  }
+  function renderNotificationSettings() { renderAutoTurnOffSetting(); }
   function renderHeader() {
     if (!root) return;
     const count = state.queue.length;
@@ -1133,8 +934,6 @@
     catch (error) { notify(error.message || 'Could not add prompt.'); return false; }
   }
   function pause(message = 'Paused', outcome = 'interrupted', reason = 'unexpected') {
-    const finishedRun = activeRun;
-    activeRun = null; // Retire synchronously: no second terminal notification.
     state.running = false;
     state.senderLockRoute = null;
     newChatHandoff = null;
@@ -1142,10 +941,6 @@
     observedStopDuringSend = false;
     setStatus(message);
     wake();
-    // Pagehide leaves the background record for tabs.onUpdated(discarded) or
-    // tabs.onRemoved; an unload is not evidence of success or failure.
-    if (finishedRun && outcome !== 'abandoned')
-      terminalEventPromise = runEvent(finishedRun, outcome, reason);
     scheduleIdleSleep();
   }
   function setTab(tab) {
@@ -1208,7 +1003,6 @@
         render();
         renderNotificationSettings();
         if (settingsOpen) {
-          void updateNotificationPermission();
           void refreshShortcut();
         }
         setPanelPosition(panelOffsetX, panelOffsetY);
@@ -1225,32 +1019,6 @@
         render();
         setPanelPosition(panelOffsetX, panelOffsetY);
         break;
-      case 'test-notification-sound': {
-        if (!notificationSettings.enabled || !['soft', 'double', 'alert'].includes(notificationSettings.sound) ||
-            notificationSettings.soundVolume === 0) break;
-        const info = root.querySelector('#qfc-notify-preview');
-        info.textContent = 'Requesting sound preview…';
-        try {
-          const result = await rpc('previewSound', {
-            sound: notificationSettings.sound, duration: '2', volume: notificationSettings.soundVolume
-          });
-          info.textContent = result?.played
-            ? 'Sound preview requested. Check your device volume if it is not audible.'
-            : 'Sound preview unavailable. Check ChromeOS audio settings.';
-        } catch (_) { info.textContent = 'Could not start sound preview.'; }
-        break;
-      }
-      case 'test-desktop-notification': {
-        const info = root.querySelector('#qfc-notify-preview');
-        info.textContent = 'Requesting test notification…';
-        try {
-          const result = await rpc('testNotification');
-          info.textContent = result?.requested
-            ? 'Test notification requested from Chrome. Check ChromeOS notifications.'
-            : 'Test notification unavailable or blocked.';
-        } catch (_) { info.textContent = 'Could not request test notification.'; }
-        break;
-      }
       case 'reset-position': resetPanelPosition(); break;
       case 'tab-queue': setTab('queue'); break;
       case 'tab-workflows': setTab('workflows'); break;
@@ -1379,17 +1147,15 @@
       case 'export-workflows': {
         // Read committed values, not pending optimistic UI selections, and obtain
         // the current workflow revision from the serialized coordinator.
-        if (notificationWriteLoop) await notificationWriteLoop;
-        if (autoOffWriteLoop) await autoOffWriteLoop;
+          if (autoOffWriteLoop) await autoOffWriteLoop;
         const [record, stored] = await Promise.all([
-          rpc('getWorkflows'), STORAGE.get([C.SETTINGS_KEY, C.NOTIFICATION_SETTINGS_KEY])
+          rpc('getWorkflows'), STORAGE.get(C.SETTINGS_KEY)
         ]);
         downloadJson({
-          app: 'Queued for ChatGPT', kind: 'workflows', version: 4,
+          app: 'Queued for ChatGPT', kind: 'workflows', version: 5,
           exportedAt: new Date().toISOString(), workflows: record.items,
           settings: {
-            autoTurnOffMinutes: C.cleanAutoTurnOffMinutes(stored[C.SETTINGS_KEY]?.autoTurnOffMinutes),
-            notificationSettings: C.cleanNotificationSettings(stored[C.NOTIFICATION_SETTINGS_KEY])
+            autoTurnOffMinutes: C.cleanAutoTurnOffMinutes(stored[C.SETTINGS_KEY]?.autoTurnOffMinutes)
           }
         }, 'queued-for-chatgpt-workflows-and-settings.json');
         notify('Workflow and settings backup exported.');
@@ -1437,7 +1203,7 @@
       // backups have no settings field and leave preferences unchanged.
       const importedSettings = C.validateBackupSettings(data?.settings);
       if (importedSettings && !confirm(
-        'Restore the auto turn-off duration and notification preferences from this backup too? This replaces those settings across ChatGPT tabs.')) return;
+        'Restore the auto turn-off duration from this backup too? This replaces that setting across ChatGPT tabs.')) return;
       const before = state.workflows.length;
       await workflowOp('import', {payload: data});
       const added = Math.max(0, state.workflows.length - before);
@@ -1445,7 +1211,6 @@
         notify(`Imported ${added} new workflows. Existing settings were kept.`);
         return;
       }
-      if (notificationWriteLoop) await notificationWriteLoop;
       if (autoOffWriteLoop) await autoOffWriteLoop;
       const existing = (await STORAGE.get(C.SETTINGS_KEY))[C.SETTINGS_KEY];
       const appSettings = existing && typeof existing === 'object' &&
@@ -1454,8 +1219,7 @@
         await STORAGE.set({
           [C.SETTINGS_KEY]: {
             ...appSettings, autoTurnOffMinutes: importedSettings.autoTurnOffMinutes
-          },
-          [C.NOTIFICATION_SETTINGS_KEY]: importedSettings.notificationSettings
+          }
         });
       } catch (_) {
         notify(`Imported ${added} workflows, but settings could not be restored. Check storage and retry.`);
@@ -1464,11 +1228,9 @@
       // The storage listener also updates other tabs. Refresh this tab
       // explicitly in case a browser mock or existing listener was unavailable.
       autoTurnOffMinutes = confirmedAutoTurnOffMinutes = importedSettings.autoTurnOffMinutes;
-      notificationSettings = confirmedNotificationSettings = importedSettings.notificationSettings;
-      autoOffSaveStatus = notificationSaveStatus = 'Saved';
+      autoOffSaveStatus = 'Saved';
       renderNotificationSettings();
       scheduleIdleSleep();
-      void rpc('stopSound').catch(() => {});
       notify(`Imported ${added} new workflows and restored settings.`);
     } catch (error) {
       notify(error.message || 'Could not import workflow backup.');
@@ -1759,9 +1521,12 @@
       const newest = all[all.length - 1];
       if (newest && newest !== oldAssistant) {
         lastReply = newest;
-        const text = C.normalize(assistantText(newest));
-        if (text && text !== lastText) { lastText = text; replyChangedAt = Date.now(); }
-        if (text) sawReply = true;
+        // Skip full response text reads while ChatGPT is streaming.
+        if (!stop) {
+          const text = C.normalize(assistantText(newest));
+          if (text && text !== lastText) { lastText = text; replyChangedAt = Date.now(); }
+          if (text) sawReply = true;
+        }
       }
       const stableFor = Date.now() - Math.max(lastAssistantChange, replyChangedAt);
       // Never treat merely an idle composer or absent Stop button as completion.
@@ -1812,7 +1577,7 @@
         if (!finished) { pause('Response completion uncertain. Verify ChatGPT, then use ✓ Done.', 'interrupted', 'response'); return; }
         trackingSendAttempt = false;
         if (!healthyRoute(route)) return;
-        await queueOp('complete', { id: item.id }, route); recordVerified(item); render();
+        await queueOp('complete', { id: item.id }, route); render();
         setStatus('Response complete; continuing queue…');
       }
       if (state.running) pause('Queue complete.', 'success');
@@ -1865,7 +1630,6 @@
       }
       if (!healthyRoute(stableRoute)) return;
       await queueOp('complete', { id: handoff.id }, stableRoute);
-      recordVerified(first);
       trackingSendAttempt = false;
       newChatHandoff = null;
       setStatus('First response complete; continuing queue…');
@@ -1932,7 +1696,6 @@
         // Only the lock owner with a ready queue may register a run.
         // Pause can occur while the queue was being loaded asynchronously.
         if (!healthyRoute(route)) return;
-        await beginRun();
         if (!healthyRoute(route)) return;
         if (route.startsWith('new:')) await runFirstPromptInNewChat(route);
         else await runQueue(route);
@@ -1953,7 +1716,7 @@
   async function sleepTab(manual) {
     if (disposed || disposing) return false;
     if (manual) {
-      if (uiOperations || pendingWorkflowLoads.size || notificationWriteLoop || autoOffWriteLoop || state.routeLoading) {
+      if (uiOperations || pendingWorkflowLoads.size || autoOffWriteLoop || state.routeLoading) {
         notify('Finish the current save or load before turning Queued off.');
         return false;
       }
@@ -1973,13 +1736,12 @@
       try { await rpc('tabClosing', { instanceId: PAGE_ID }); } catch (_) { /* Continue safe shutdown. */ }
       // Never tear down a runner before it has released the Web Lock.
       if (runnerPromise) await runnerPromise.catch(() => {});
-      if (terminalEventPromise) await terminalEventPromise.catch(() => {});
-      if (notificationWriteLoop) await notificationWriteLoop.catch(() => {});
       if (autoOffWriteLoop) await autoOffWriteLoop.catch(() => {});
     } finally {
       // Finalization must run even when an operation above fails. A partially
       // disposed script must never retain its injection guard permanently.
-      for (const timer of transientTimers) clearTimeout(timer);
+      clearDomWake();
+    for (const timer of transientTimers) clearTimeout(timer);
       transientTimers.clear();
       for (const url of pendingDownloadUrls) {
         try { URL.revokeObjectURL(url); } catch (_) {}
@@ -2044,7 +1806,7 @@
         // Stop may appear and disappear while the coordinator acknowledges the
         // user receipt. Retain observed generation evidence for this one send.
         if (trackingSendAttempt && isGenerating()) observedStopDuringSend = true;
-        wake();
+        queueDomWake();
         if (location.pathname !== lastPathname) scheduleRouteCheck();
       }
     });
@@ -2092,16 +1854,13 @@
     initPanel();
     try {
       const [record, settings] = await Promise.all([
-        rpc('getWorkflows'), STORAGE.get([C.SETTINGS_KEY, C.NOTIFICATION_SETTINGS_KEY])
+        rpc('getWorkflows'), STORAGE.get(C.SETTINGS_KEY)
       ]);
       applyWorkflows(record);
       // Opening is local to an activation, not the obsolete cross-tab open flag.
       state.open = false;
       autoTurnOffMinutes = C.cleanAutoTurnOffMinutes(settings[C.SETTINGS_KEY]?.autoTurnOffMinutes);
       confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
-      notificationSettings = C.cleanNotificationSettings(settings[C.NOTIFICATION_SETTINGS_KEY]);
-      confirmedNotificationSettings = notificationSettings;
-      if (notificationSettings.soundDuration !== 'once') customSecondsDraft = notificationSettings.soundDuration;
       renderNotificationSettings();
     } catch (_) { state.storageHealthy = false; setStatus('Could not load workflows. Reload the tab.'); }
     checkRoute();
@@ -2117,13 +1876,6 @@
         autoOffSaveStatus = 'Saved';
         renderAutoTurnOffSetting();
         scheduleIdleSleep({ reset: true });
-      }
-      if (changes[C.NOTIFICATION_SETTINGS_KEY] && !notificationWriteLoop &&
-          settingsRevision === savedSettingsRevision) {
-        notificationSettings = C.cleanNotificationSettings(changes[C.NOTIFICATION_SETTINGS_KEY].newValue);
-        confirmedNotificationSettings = notificationSettings;
-        notificationSaveStatus = 'Saved';
-        renderNotificationSettings();
       }
       if (changes[C.WORKFLOWS_KEY]) applyWorkflows(changes[C.WORKFLOWS_KEY].newValue);
       if (state.route && changes[C.queueKey(state.route)]) applyQueue(state.route, changes[C.queueKey(state.route)].newValue);

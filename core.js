@@ -40,23 +40,24 @@
       visibility: ['system', 'persistent'].includes(value.visibility) ? value.visibility : defaults.visibility
     };
   }
-  // New v4 workflow backups include the selected idle timeout and all notification
-  // preferences. Existing v3 (workflow-only) backups remain importable.
+  // v5 backups contain idle preferences only. v4 notification fields are ignored.
   function validateBackupSettings(settings) {
     if (settings === undefined) return null;
     if (!settings || typeof settings !== 'object' || Array.isArray(settings) ||
-        !validAutoTurnOffMinutes(settings.autoTurnOffMinutes) ||
-        !settings.notificationSettings || typeof settings.notificationSettings !== 'object' ||
-        Array.isArray(settings.notificationSettings))
+        !validAutoTurnOffMinutes(settings.autoTurnOffMinutes))
       throw new Error('Invalid settings in workflow backup.');
-    const source = settings.notificationSettings;
-    const cleaned = cleanNotificationSettings(source);
-    for (const key of Object.keys(DEFAULT_NOTIFICATION_SETTINGS)) {
-      if (!Object.hasOwn(source, key) || source[key] !== cleaned[key])
-        throw new Error('Invalid notification settings in workflow backup.');
+    // Older v4 backups included notification preferences; validate but ignore.
+    if (Object.hasOwn(settings, 'notificationSettings')) {
+      const source = settings.notificationSettings;
+      if (!source || typeof source !== 'object' || Array.isArray(source))
+        throw new Error('Invalid legacy notification settings in workflow backup.');
+      const cleaned = cleanNotificationSettings(source);
+      for (const key of Object.keys(DEFAULT_NOTIFICATION_SETTINGS)) {
+        if (!Object.hasOwn(source, key) || source[key] !== cleaned[key])
+          throw new Error('Invalid legacy notification settings in workflow backup.');
+      }
     }
-    return { autoTurnOffMinutes: settings.autoTurnOffMinutes,
-      notificationSettings: cleaned };
+    return { autoTurnOffMinutes: settings.autoTurnOffMinutes };
   }
   const WORKFLOWS_KEY = 'qfc_v3_workflows';
   const MAX_WORKFLOWS = 200;
