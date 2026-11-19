@@ -286,3 +286,9 @@ chrome.commands.onCommand.addListener(async (command, tab) => {
 });
 chrome.action?.onClicked?.addListener(requestTabOpening);
 
+// Release per-tab shutdown handshakes on navigation or tab removal.
+chrome.tabs?.onUpdated?.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'complete' || typeof changeInfo.url === 'string')
+    closingTabs.delete(tabId);
+});
+chrome.tabs?.onRemoved?.addListener(tabId => closingTabs.delete(tabId));

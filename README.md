@@ -14,7 +14,7 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 **New in v1.2.13:** The ✕ close/turn-off button now appears immediately **to the right of − minimize** in the floating header. Both controls use matching neutral backgrounds, text colors, font size, and bold weight (including dark mode); behavior remains unchanged.
 
-**New in v1.2.12:** Set **Automatic turn-off** in ⚙ Settings to Never, 1, 5, 10, 15, 30 or 60 minutes (default 5). The header **−** minimizes to the live Queue dock, while **✕** closes Queued and turns it off in that tab. **Export workflows + settings** now includes your duration and all desktop notification preferences in a version 5 JSON backup; importing confirms before replacing settings. Older workflow-only backups remain compatible.
+**New in v1.2.12:** Set **Automatic turn-off** in ⚙ Settings to Never, 1, 5, 10, 15, 30 or 60 minutes (default 5). The header **−** minimizes to the live Queue dock, while **✕** closes Queued and turns it off in that tab. **Export workflows + settings** introduced idle duration and desktop notification preferences in a version 4 JSON backup (notifications removed in v1.2.18); importing confirms before replacing settings. Older workflow-only backups remain compatible.
 
 **New in v1.2.11:** Queued loads only when you click the Chrome toolbar icon or press **Alt+Shift+Q**. Its compact **⏻** control disables only that ChatGPT tab. Five minutes of inactivity puts an idle tab to sleep, releasing its UI and observer without deleting prompts or workflows. An authoritative queue-end refresh improves the cross-tab Load boundary, and expanded workflow scrolling flows into the outer list. The conservative send/response safeguards remain unchanged.
 
@@ -22,7 +22,7 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 **New in v1.2.9:** Introduced compact workflow chevrons and the in-panel Notification Settings view with locally generated custom chimes.
 
-**New in v1.2.8:** Receive one Chrome desktop notification when a run completes after verified responses or automatically stops because it needs attention. User Pause and manual Stop remain silent. Chrome Memory Saver discards generate best-effort interruption alerts; clicking a notification returns to the originating ChatGPT tab if it still exists. No server, background polling or prompt/response text is added to notification records. The only new permission is **notifications**.
+**New in v1.2.8:** Receive one Chrome desktop notification when a run completes after verified responses or automatically stops because it needs attention. User Pause and manual Stop remain silent. Chrome Memory Saver discards generate best-effort interruption alerts; clicking a notification returns to the originating ChatGPT tab if it still exists. No server, background polling or prompt/response text is added to notification records. The v1.2.8 release introduced notifications; the feature and permission were removed in v1.2.18.
 
 **New in v1.2.7:** Start Workflow and + Load keep the Workflows page open; **Alt+Shift+Q** toggles the floating panel (reassign at `chrome://extensions/shortcuts`); Recent Activity is collapsed by default and expands on demand. Idle DOM work and hidden-list rendering are reduced without changing sender locks, prompt submission or response-confirmation safeguards.
 

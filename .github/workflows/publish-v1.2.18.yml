@@ -157,15 +157,16 @@ jobs:
           A lightweight Chrome / Chromebook extension for safe, on-demand ChatGPT workflows.
 
           ### New in v1.2.18
-          - **Composer readiness:** Transient text can clear before a pause, and the composer must remain empty and idle for the actual settling interval.
+          - **Lighter observation:** DOM-triggered wakeups are coalesced and repeated full response extraction is skipped during streaming.
           - **Safe recovery:** Revalidate after the queue reservation and roll back only if no insertion was attempted.
           - **Draft protection:** Persistent drafts and uncertain sends remain protected; existing startup and reopening safeguards are retained.
-          - **Lightweight:** No new permissions, persistent polling, external libraries, or changes to version 4 backups.
+          - **Notifications removed:** Desktop alerts, custom sounds, offscreen playback and the notification/offscreen permissions are removed. New backups are v5, and legacy v3/v4 imports are compatible.
           - **Regression coverage:** Coordinator and simulated Chromium draft, sequential-send and reservation-race tests.
 
           ### Install or upgrade
           1. Download **queued-for-chatgpt-v1.2.18.zip** from the Assets section and extract it.
           2. At `chrome://extensions`, select **Load unpacked** and select the extracted folder containing `manifest.json`.
+          3. For an existing install, preserve the original extension folder and ID, replace the files, click Reload, then refresh ChatGPT.
           4. Only **storage**, **activeTab**, and **scripting** permissions are required.
 
           ### Validation

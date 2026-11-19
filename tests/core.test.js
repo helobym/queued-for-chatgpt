@@ -122,7 +122,7 @@ test('auto turn-off duration has safe defaults and supports Never', () => {
   }
 });
 
-test('v4 workflow backup settings validate strictly without losing notification opt-outs', () => {
+test('v4 notification backup validates but restores only the idle timeout', () => {
   assert.equal(core.validateBackupSettings(undefined), null);
   const backup = {
     autoTurnOffMinutes: 0,
@@ -132,9 +132,10 @@ test('v4 workflow backup settings validate strictly without losing notification 
       visibility: 'persistent'
     }
   };
-  assert.deepEqual(core.validateBackupSettings(backup), backup);
+  assert.deepEqual(core.validateBackupSettings(backup), {autoTurnOffMinutes: 0});
+  assert.deepEqual(core.validateBackupSettings({autoTurnOffMinutes: 5}), {autoTurnOffMinutes: 5});
   assert.deepEqual(core.validateBackupSettings({...backup, autoTurnOffMinutes: 15}),
-    {...backup, autoTurnOffMinutes: 15});
+    {autoTurnOffMinutes: 15});
   assert.throws(() => core.validateBackupSettings({...backup, autoTurnOffMinutes: '0'}), /Invalid settings/);
   assert.throws(() => core.validateBackupSettings({...backup, autoTurnOffMinutes: 120}), /Invalid settings/);
   assert.throws(() => core.validateBackupSettings({

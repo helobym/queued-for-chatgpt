@@ -711,7 +711,6 @@
     }
     renderShortcut();
   }
-  function renderNotificationSettings() { renderAutoTurnOffSetting(); }
   function renderHeader() {
     if (!root) return;
     const count = state.queue.length;
@@ -1001,7 +1000,7 @@
       case 'open-settings':
         settingsOpen = !settingsOpen;
         render();
-        renderNotificationSettings();
+        renderAutoTurnOffSetting();
         if (settingsOpen) {
           void refreshShortcut();
         }
@@ -1147,7 +1146,7 @@
       case 'export-workflows': {
         // Read committed values, not pending optimistic UI selections, and obtain
         // the current workflow revision from the serialized coordinator.
-          if (autoOffWriteLoop) await autoOffWriteLoop;
+        if (autoOffWriteLoop) await autoOffWriteLoop;
         const [record, stored] = await Promise.all([
           rpc('getWorkflows'), STORAGE.get(C.SETTINGS_KEY)
         ]);
@@ -1229,7 +1228,7 @@
       // explicitly in case a browser mock or existing listener was unavailable.
       autoTurnOffMinutes = confirmedAutoTurnOffMinutes = importedSettings.autoTurnOffMinutes;
       autoOffSaveStatus = 'Saved';
-      renderNotificationSettings();
+      renderAutoTurnOffSetting();
       scheduleIdleSleep();
       notify(`Imported ${added} new workflows and restored settings.`);
     } catch (error) {
@@ -1741,7 +1740,7 @@
       // Finalization must run even when an operation above fails. A partially
       // disposed script must never retain its injection guard permanently.
       clearDomWake();
-    for (const timer of transientTimers) clearTimeout(timer);
+      for (const timer of transientTimers) clearTimeout(timer);
       transientTimers.clear();
       for (const url of pendingDownloadUrls) {
         try { URL.revokeObjectURL(url); } catch (_) {}
@@ -1861,7 +1860,7 @@
       state.open = false;
       autoTurnOffMinutes = C.cleanAutoTurnOffMinutes(settings[C.SETTINGS_KEY]?.autoTurnOffMinutes);
       confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
-      renderNotificationSettings();
+      renderAutoTurnOffSetting();
     } catch (_) { state.storageHealthy = false; setStatus('Could not load workflows. Reload the tab.'); }
     checkRoute();
     render();
@@ -1896,6 +1895,7 @@
     clearIdleTimer();
     if (routeTimer) clearTimeout(routeTimer);
     routeTimer = null;
+    clearDomWake();
     for (const timer of transientTimers) clearTimeout(timer);
     transientTimers.clear();
     try { pageObserver?.disconnect(); } catch (_) {}
