@@ -83,6 +83,8 @@
 #qfc-root .qfc-hotkey-value { display: inline-block; padding: 7px 9px; border: 1px solid #adbbb4; border-radius: 7px; background: #f4f7f4; color: #1c3526; font: 600 12px/1.4 ui-monospace, monospace; }
 #qfc-root .qfc-hotkey-manage { margin-top: 8px; }
 #qfc-root #qfc-auto-turn-off-status { margin-bottom: 8px; }
+#qfc-root .qfc-settings select { width: 100%; min-height: 33px; border: 1px solid #adbbb4; border-radius: 7px; padding: 5px 7px; background: #fff; color: #182c20; font-size: 12px; }
+#qfc-root .qfc-settings select:focus-visible { outline: 2px solid #0b8157; outline-offset: 2px; }
 #qfc-root .qfc-settings .qfc-label { margin: 10px 0 4px; }
 #qfc-root .qfc-settings-feedback { margin: 5px 0 8px; min-height: 14px; font-size: 11px; color: #50665b; }
 #qfc-root .qfc-settings-feedback[data-state="saved"] { color: #176b4c; }
@@ -109,6 +111,7 @@
   #qfc-root .qfc-head small, #qfc-root .qfc-meta, #qfc-root .qfc-empty { color: #b6c7ba; }
   #qfc-root .qfc-settings-head { border-color: #3b4b40; }
   #qfc-root .qfc-hotkey-value { background: #17231c; border-color: #5d7063; color: #f1f6f3; }
+  #qfc-root .qfc-settings select { background: #17231c; border-color: #5d7063; color: #f1f6f3; }
   #qfc-root .qfc-settings-feedback { color: #b6c7ba; }
   #qfc-root .qfc-settings-feedback[data-state="saved"] { color: #70d5a0; }
   #qfc-root .qfc-settings-feedback[data-state="error"] { color: #ff9e9e; }
