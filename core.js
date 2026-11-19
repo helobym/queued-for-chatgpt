@@ -50,11 +50,11 @@
     if (Object.hasOwn(settings, 'notificationSettings')) {
       const source = settings.notificationSettings;
       if (!source || typeof source !== 'object' || Array.isArray(source))
-        throw new Error('Invalid legacy notification settings in workflow backup.');
+        throw new Error('Invalid notification settings in workflow backup.');
       const cleaned = cleanNotificationSettings(source);
       for (const key of Object.keys(DEFAULT_NOTIFICATION_SETTINGS)) {
         if (!Object.hasOwn(source, key) || source[key] !== cleaned[key])
-          throw new Error('Invalid legacy notification settings in workflow backup.');
+          throw new Error('Invalid notification settings in workflow backup.');
       }
     }
     return { autoTurnOffMinutes: settings.autoTurnOffMinutes };
