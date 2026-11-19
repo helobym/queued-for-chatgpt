@@ -91,6 +91,7 @@ jobs:
 
       - name: Run simulated Chromium reliability regressions
         run: |
+          python3 tests/smoke_settings_backup.py
           python3 tests/smoke_tab_sleep.py
           python3 tests/smoke_idle_after_run.py
           python3 tests/smoke_workflow_scroll.py
