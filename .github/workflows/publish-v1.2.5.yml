@@ -1,10 +1,6 @@
 name: Publish v1.2.5 GitHub Release
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/publish-v1.2.5.yml'
   workflow_dispatch:
 
 permissions:
