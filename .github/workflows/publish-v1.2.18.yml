@@ -97,6 +97,7 @@ jobs:
           python3 tests/smoke_workflow_scroll.py
           python3 tests/smoke_v127_ui.py
           python3 tests/smoke_send_receipt_safety.py
+          python3 tests/smoke_send_button_retry.py
           python3 tests/smoke_stop_lifecycle.py
           python3 tests/smoke_app_shell.py
           python3 tests/smoke_app_shell_uncertain.py
