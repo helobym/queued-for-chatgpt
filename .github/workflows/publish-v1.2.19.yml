@@ -149,6 +149,16 @@ jobs:
           print(f'Packaged {archive} ({archive.stat().st_size} bytes); SHA256 {checksum}')
           PY
 
+      - name: Upload verified v1.2.19 build for download from Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: queued-for-chatgpt-v1.2.19
+          path: |
+            queued-for-chatgpt-v1.2.19.zip
+            queued-for-chatgpt-v1.2.19.zip.sha256
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Publish v1.2.19 with installation package
         shell: bash
         env:
@@ -182,8 +192,13 @@ jobs:
             echo 'v1.2.19 release already exists; refusing to overwrite tagged release assets.'
             exit 0
           fi
-          gh release create v1.2.19 queued-for-chatgpt-v1.2.19.zip queued-for-chatgpt-v1.2.19.zip.sha256 \
-            --title 'Queued for ChatGPT v1.2.19' \
-            --notes-file /tmp/qfc-release-notes.md \
-            --target "$GITHUB_SHA" \
-            --latest
+          if gh release create v1.2.19 queued-for-chatgpt-v1.2.19.zip queued-for-chatgpt-v1.2.19.zip.sha256 \
+              --title 'Queued for ChatGPT v1.2.19' \
+              --notes-file /tmp/qfc-release-notes.md \
+              --target "$GITHUB_SHA" \
+              --latest; then
+            echo 'GitHub Release v1.2.19 published.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '::warning::GitHub denied Release creation. The tested ZIP and checksum remain downloadable in this run under Artifacts.'
+            echo 'GitHub Release publication was denied. Download the v1.2.19 ZIP and checksum from this run under Artifacts.' >> "$GITHUB_STEP_SUMMARY"
+          fi

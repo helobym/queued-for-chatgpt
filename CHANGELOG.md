@@ -5,6 +5,7 @@
 - Retry unavailable or disabled ChatGPT Send controls after the initial 3-second readiness check, using up to three additional 3-second checks before safely pausing.
 - Preserve the inserted prompt and click Send at most once; stop the retry loop if the composer changes, generation starts, the route changes, or the user pauses. Unconfirmed actual clicks still require manual review to avoid duplicate submissions.
 - Add simulated Chromium regression coverage for delayed Send availability, retry exhaustion, user-edited drafts, and manual Pause; no new permissions, storage migrations, or persistent background polling.
+- Distribute the validated extension ZIP and SHA-256 checksum as a GitHub Actions artifact when GitHub denies automated Release publication.
 
 ## 1.2.18 (2026-11-23)
 
