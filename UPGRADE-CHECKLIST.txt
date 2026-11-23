@@ -1,11 +1,11 @@
-QUEUED FOR CHATGPT — Upgrade to v1.2.19
+QUEUED FOR CHATGPT — Upgrade to v1.2.20
 
 [ ] Finish active workflows or pause and review uncertain prompts.
 [ ] Export important Saved Workflows and keep the JSON backup somewhere safe.
 [ ] Keep the SAME installed extension folder and extension ID. Do not uninstall first.
-[ ] Download queued-for-chatgpt-v1.2.19.zip from GitHub Release v1.2.19 if available, or from Actions > Publish v1.2.19 > latest run > Artifacts (extract the outer artifact ZIP first).
+[ ] Download queued-for-chatgpt-v1.2.20.zip from GitHub Release v1.2.20 if available, or from Actions > Publish v1.2.20 > latest run > Artifacts (extract the outer artifact ZIP first).
 [ ] Replace the old extension files in that SAME folder. Older offscreen.html / offscreen.js files can be removed; they are no longer used.
-[ ] Open chrome://extensions, Reload the existing extension, and verify v1.2.19.
+[ ] Open chrome://extensions, Reload the existing extension, and verify v1.2.20.
 [ ] Refresh ChatGPT tabs and open the panel using toolbar or Alt+Shift+Q.
 [ ] Confirm Settings shows keyboard shortcut and idle turn-off only (no desktop notification settings).
 [ ] Verify idle turn-off options, Never, and safe no-sleep behavior during active/uncertain prompts.
@@ -16,6 +16,7 @@ QUEUED FOR CHATGPT — Upgrade to v1.2.19
 [ ] Test Add/Start/Pause/Load/Copy, New Chat/Project navigation, and manual Done/Retry recovery.
 [ ] Run two prompts sequentially and verify the second is sent only after the first reply and composer settle.
 [ ] If Send is initially unavailable, verify up to three additional 3-second readiness retries before pausing; confirm a successful send is clicked only once and an unsent draft is never overwritten.
+[ ] If a reply cannot be confirmed at its normal deadline, verify three additional 3-second response checks; confirm they never resend the prompt, never bypass completion proof, and manual Pause prevents the next prompt.
 [ ] Verify persistent drafts are protected and manual Stop does not trigger another prompt.
 [ ] Compare CPU/RAM with earlier builds if desired; real-world savings are not guaranteed.
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.20 (2026-11-23)
+
+- After the normal response-completion deadline, retry the existing completion-evidence checks in three additional 3-second windows before safely pausing.
+- Preserve observed Stop and assistant-reply evidence across retries; require the same independent completion proof as before. Never resend a prompt or advance the queue on uncertainty.
+- Apply response verification retries to existing chats and first prompts in New Chat/Projects. Preserve manual Pause and route-change status instead of overwriting them with a timeout warning.
+- Add simulated Chromium regression coverage for delayed completion controls, exhausted retries, and manual Pause, with no new permissions, storage migrations or background polling.
+
 ## 1.2.19 (2026-11-23)
 
 - Retry unavailable or disabled ChatGPT Send controls after the initial 3-second readiness check, using up to three additional 3-second checks before safely pausing.

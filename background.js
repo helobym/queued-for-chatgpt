@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.19 — on-demand activation, recoverable startup and shutdown. */
+/* Queued for ChatGPT v1.2.20 — on-demand activation, recoverable startup and shutdown. */
 'use strict';
 importScripts('core.js', 'coordinator.js');
 const C = globalThis.QFC;

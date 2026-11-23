@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.19 — bounded Send readiness retries and safe sequential queue recovery. */
+/* Queued for ChatGPT v1.2.20 — bounded Send and response completion retries. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -1535,29 +1535,37 @@
     const deadline = Date.now() + 10 * 60 * 1000;
     let sawStop = sawStopEarlier, sawReply = false;
     let lastReply = null, lastText = '', replyChangedAt = Date.now();
-    while (healthyRoute(route) && Date.now() < deadline) {
-      const stop = isGenerating();
-      if (stop) sawStop = true;
-      const all = assistantMessages();
-      const newest = all[all.length - 1];
-      if (newest && newest !== oldAssistant) {
-        lastReply = newest;
-        // Skip full response text reads while ChatGPT is streaming.
-        if (!stop) {
-          const text = C.normalize(assistantText(newest));
-          if (text && text !== lastText) { lastText = text; replyChangedAt = Date.now(); }
-          if (text) sawReply = true;
+    // Retry only completion observation, never Send. Retain Stop and reply
+    // evidence from the initial wait across all three additional checks.
+    const RESPONSE_RETRY_MS = 3000;
+    const MAX_RESPONSE_RETRIES = 3;
+    for (let retry = 0; retry <= MAX_RESPONSE_RETRIES && healthyRoute(route); retry++) {
+      if (retry) setStatus(`Checking response completion — retry ${retry}/${MAX_RESPONSE_RETRIES}…`);
+      const checkDeadline = retry === 0 ? deadline : Date.now() + RESPONSE_RETRY_MS;
+      while (healthyRoute(route) && Date.now() < checkDeadline) {
+        const stop = isGenerating();
+        if (stop) sawStop = true;
+        const all = assistantMessages();
+        const newest = all[all.length - 1];
+        if (newest && newest !== oldAssistant) {
+          lastReply = newest;
+          // Skip full response text reads while ChatGPT is streaming.
+          if (!stop) {
+            const text = C.normalize(assistantText(newest));
+            if (text && text !== lastText) { lastText = text; replyChangedAt = Date.now(); }
+            if (text) sawReply = true;
+          }
         }
+        const stableFor = Date.now() - Math.max(lastAssistantChange, replyChangedAt);
+        // Never treat merely an idle composer or absent Stop button as completion.
+        // A real new assistant reply AND an observed Stop lifecycle or completion
+        // control are both required, plus settling time.
+        if (sawReply && !stop && stableFor >= 1700 &&
+            (sawStop || assistantHasCompletedActions(lastReply))) return true;
+        const remaining = checkDeadline - Date.now();
+        if (remaining <= 0) break;
+        await signalOrTimeout(Math.min(remaining, sawReply && !stop ? 1800 : 5000));
       }
-      const stableFor = Date.now() - Math.max(lastAssistantChange, replyChangedAt);
-      // Never treat merely an idle composer or absent Stop button as completion.
-      // A real new assistant reply AND an observed Stop lifecycle or completion
-      // control are both required, plus settling time.
-      if (sawReply && !stop && stableFor >= 1700 &&
-          (sawStop || assistantHasCompletedActions(lastReply))) return true;
-      const remaining = deadline - Date.now();
-      if (!remaining) break;
-      await signalOrTimeout(Math.min(remaining, sawReply && !stop ? 1800 : 5000));
     }
     return false;
   }
@@ -1595,7 +1603,10 @@
         await queueOp('awaiting', { id: item.id }, route); render();
         setStatus('Waiting for response to finish…');
         const finished = await waitForResponse(oldAssistant, route, observedStopDuringSend);
-        if (!finished) { pause('Response completion uncertain. Verify ChatGPT, then use ✓ Done.', 'interrupted', 'response'); return; }
+        if (!finished) {
+          if (healthyRoute(route)) pause('Response completion uncertain after 3 retries. Verify ChatGPT, then use ✓ Done.', 'interrupted', 'response');
+          return;
+        }
         trackingSendAttempt = false;
         if (!healthyRoute(route)) return;
         await queueOp('complete', { id: item.id }, route); render();
@@ -1647,7 +1658,8 @@
       setStatus(evidence.receipt === 'assistant'
         ? 'First reply detected; verifying completion…' : 'Waiting for the first response…');
       if (!await waitForResponse(previousAssistant, stableRoute, evidence.sawStop || observedStopDuringSend)) {
-        pause('First response completion uncertain. Use ✓ Done after reviewing.', 'interrupted', 'response'); return;
+        if (healthyRoute(stableRoute)) pause('First response completion uncertain after 3 retries. Use ✓ Done after reviewing.', 'interrupted', 'response');
+        return;
       }
       if (!healthyRoute(stableRoute)) return;
       await queueOp('complete', { id: handoff.id }, stableRoute);

@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.19 — Lightweight Sequential Queue
+# Queued for ChatGPT v1.2.20 — Lightweight Sequential Queue
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**⬇ Get v1.2.19:** Download the verified ZIP and SHA-256 checksum from [GitHub Actions — v1.2.19 builds](https://github.com/helobym/queued-for-chatgpt/actions/workflows/publish-v1.2.19.yml) → latest run → **Artifacts** → `queued-for-chatgpt-v1.2.19`. The [v1.2.19 Release page](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.19) is another option if GitHub allows release publication. GitHub Actions has currently denied release creation; source is also available through **Code → Download ZIP**.
+**⬇ Get v1.2.20:** Download the extension ZIP and SHA-256 checksum from the [v1.2.20 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.20), or if GitHub blocks release creation, from [GitHub Actions — v1.2.20 builds](https://github.com/helobym/queued-for-chatgpt/actions/workflows/publish-v1.2.20.yml) → latest successful run → **Artifacts** → `queued-for-chatgpt-v1.2.20`. Source is also available through **Code → Download ZIP**.
+
+**New in v1.2.20:** If ChatGPT's response completion cannot be confirmed at the normal deadline, Queued makes three additional 3-second verification checks before pausing. These checks only observe the response; they never resend a prompt or accept an idle composer as proof. New Chat/Project and existing-chat queues share the behavior. Manual Pause and route changes stop the checks. No new Chrome permissions, storage migrations, or background polling.
 
 **New in v1.2.19:** Send-button readiness is checked for up to 3 seconds initially and retried in three more 3-second windows before pausing. The prompt is inserted only once, Send is clicked at most once, edits and uncertain submissions remain protected, and the retry loop stops on manual Pause. No additional permissions, background polling, or storage migration. Simulated Chromium regressions cover delayed Send readiness, retry exhaustion, draft edits, and manual Pause.
 
@@ -44,13 +46,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Download **`queued-for-chatgpt-v1.2.19.zip`** from the [v1.2.19 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.19), if available, or from the [latest v1.2.19 Actions run](https://github.com/helobym/queued-for-chatgpt/actions/workflows/publish-v1.2.19.yml) → **Artifacts** → `queued-for-chatgpt-v1.2.19`. An Actions artifact is an outer ZIP containing the extension ZIP and its checksum; extract the outer ZIP first. The extension ZIP contains `manifest.json` at its root.
+1. Download **`queued-for-chatgpt-v1.2.20.zip`** from the [v1.2.20 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.20), if available, or from the [latest v1.2.20 Actions run](https://github.com/helobym/queued-for-chatgpt/actions/workflows/publish-v1.2.20.yml) → **Artifacts** → `queued-for-chatgpt-v1.2.20`. An Actions artifact is an outer ZIP containing the extension ZIP and its checksum; extract the outer ZIP first. The extension ZIP contains `manifest.json` at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.19**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.20**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Click the **Queued for ChatGPT** toolbar icon or press the currently assigned shortcut (suggested **Alt+Shift+Q**). If the hotkey does nothing, open ⚙ Settings → Keyboard shortcut or `chrome://extensions/shortcuts` to check its assignment. Pin the extension in Chrome's toolbar for easier access.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -164,7 +166,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.19.zip`** from the [v1.2.19 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.19) if available, or the [v1.2.19 Actions build artifact](https://github.com/helobym/queued-for-chatgpt/actions/workflows/publish-v1.2.19.yml) (extract its outer ZIP first), and extract the extension ZIP.
+2. Download **`queued-for-chatgpt-v1.2.20.zip`** from the [v1.2.20 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.20) if available, or the [v1.2.20 Actions build artifact](https://github.com/helobym/queued-for-chatgpt/actions/workflows/publish-v1.2.20.yml) (extract its outer ZIP first), and extract the extension ZIP.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs. Queued will remain asleep until you use its toolbar icon or Alt+Shift+Q in each tab.

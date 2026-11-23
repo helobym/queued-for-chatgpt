@@ -1,21 +1,7 @@
 name: Publish v1.2.19 GitHub Release
 
+# Archived release; manual dispatch only to prevent obsolete publish jobs on main.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/publish-v1.2.19.yml'
-      - 'content.js'
-      - 'content.css'
-      - 'background.js'
-      - 'core.js'
-      - 'coordinator.js'
-      - 'manifest.json'
-      - 'tests/**'
-      - 'README.md'
-      - 'PRIVACY.md'
-      - 'CHANGELOG.md'
-      - 'UPGRADE-CHECKLIST.txt'
   workflow_dispatch:
 
 permissions:

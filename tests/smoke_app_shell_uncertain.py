@@ -24,6 +24,8 @@ with sync_playwright() as p:
        'function isNewChatPage() { return true; } function unusedPageCheck() {',1)
     code=code.replace('const deadline = Date.now() + 10 * 60 * 1000;\n    let sawStop = sawStopEarlier, sawReply = false;',
        'const deadline = Date.now() + 2800;\n    let sawStop = sawStopEarlier, sawReply = false;',1)
+    assert 'const RESPONSE_RETRY_MS = 3000;' in code
+    code=code.replace('const RESPONSE_RETRY_MS = 3000;', 'const RESPONSE_RETRY_MS = 450;',1)
     page.add_script_tag(content=code)
     page.locator('.qfc-dock').click()
     for prompt in ['First app shell has no completion controls','Second must not send']:
