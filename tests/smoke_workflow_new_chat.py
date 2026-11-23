@@ -74,10 +74,9 @@ try:
         assert page.locator('#qfc-queue-view').is_hidden()
         page.wait_for_function('''() => document.querySelector('#qfc-status').textContent.includes('Queue complete')''', timeout=30000)
         assert page.locator('#qfc-count').inner_text() == '0'
-        page.wait_for_function('window.__newChatNotices.length === 1')
-        notification = page.evaluate('window.__newChatNotices[0].options')
-        assert notification['title'] == 'Workflow completed successfully', notification
-        assert 'All 2 prompts finished · New chat workflow' in notification['message'], notification
+        # v1.2.18 deliberately removes desktop notifications. Completing a
+        # workflow must still verify both sends without generating an alert.
+        assert page.evaluate('window.__newChatNotices.length') == 0
         assert page.locator('#qfc-activity-details').is_hidden()
         page.locator('[data-action="toggle-activity"]').click()
         activity = page.locator('#qfc-activity-previous').inner_text()
