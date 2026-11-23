@@ -1,10 +1,16 @@
-# v1.2.18
+# Changelog
+
+## 1.2.19 (2026-11-23)
+
+- Retry unavailable or disabled ChatGPT Send controls after the initial 3-second readiness check, using up to three additional 3-second checks before safely pausing.
+- Preserve the inserted prompt and click Send at most once; stop the retry loop if the composer changes, generation starts, the route changes, or the user pauses. Unconfirmed actual clicks still require manual review to avoid duplicate submissions.
+- Add simulated Chromium regression coverage for delayed Send availability, retry exhaustion, user-edited drafts, and manual Pause; no new permissions, storage migrations, or persistent background polling.
+
+## 1.2.18 (2026-11-23)
 
 - Coalesce DOM-triggered runner wakeups during streaming; defer full response extraction until generation stops.
 - Remove desktop notifications, custom audio, offscreen document, and their Chrome permissions.
 - Export v5 workflow and idle-timeout backups. Continue importing v3 and v4 backups without restoring removed notification settings.
-
-# Changelog
 
 ## 1.2.17 (2026-11-19)
 

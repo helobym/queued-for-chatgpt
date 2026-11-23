@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.18 — Lightweight Sequential Queue
+# Queued for ChatGPT v1.2.19 — Lightweight Sequential Queue
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
-**[⬇ Download v1.2.18](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.18)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+**[⬇ Download v1.2.19](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.19)** — official GitHub Release with a ready-to-extract Chrome extension ZIP, installation notes, and SHA-256 checksum. Source code is also available through **Code → Download ZIP**.
+
+**New in v1.2.19:** Send-button readiness is checked for up to 3 seconds initially and retried in three more 3-second windows before pausing. The prompt is inserted only once, Send is clicked at most once, edits and uncertain submissions remain protected, and the retry loop stops on manual Pause. No additional permissions, background polling, or storage migration. Simulated Chromium regressions cover delayed Send readiness, retry exhaustion, draft edits, and manual Pause.
 
 **New in v1.2.18:** Mutation wakeups are coalesced and response text extraction is deferred during generation. Desktop notifications and custom sounds are removed. New exports use v5 backups; legacy v3/v4 imports are supported.
 
@@ -42,13 +44,13 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 Queued for ChatGPT is distributed from **GitHub**, not the Chrome Web Store. Install it as an **unpacked extension** in Google Chrome; you do not need ChromeOS Developer Mode or a Chrome Web Store account.
 
-1. Open the [v1.2.18 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.18), expand **Assets**, and download **`queued-for-chatgpt-v1.2.18.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
+1. Open the [v1.2.19 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.19), expand **Assets**, and download **`queued-for-chatgpt-v1.2.19.zip`**. Unlike the source archive, this ZIP contains extension files directly at its root.
 2. Open the downloaded ZIP in your computer's file manager (the **Files** app on a Chromebook) and **extract/unzip it** into a permanent location.
 3. Open the extracted folder and make sure you can see **`manifest.json`** alongside `content.js`, `background.js` and the `icons` folder. Keep the extracted files together.
 4. In Chrome, enter **`chrome://extensions`** in the address bar.
 5. Turn on **Developer mode** in the top-right corner of the Extensions page, then choose **Load unpacked**.
 6. Select the **extracted folder containing `manifest.json`** — **not** the ZIP itself, the `screenshots` folder, or the `tests` folder.
-7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.17**.
+7. Check that **Queued for ChatGPT** appears in your extensions list as **version 1.2.19**.
 8. Open or refresh [ChatGPT](https://chatgpt.com/). Click the **Queued for ChatGPT** toolbar icon or press the currently assigned shortcut (suggested **Alt+Shift+Q**). If the hotkey does nothing, open ⚙ Settings → Keyboard shortcut or `chrome://extensions/shortcuts` to check its assignment. Pin the extension in Chrome's toolbar for easier access.
 
 **First test:** Add two harmless prompts to the queue, click **Start**, and confirm that the next prompt is sent only after the prior response completes. Alternatively, create a saved workflow and click **▶ Start Workflow**. The extension runs on `chatgpt.com` only.
@@ -162,7 +164,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 Unpacked extensions **do not update automatically from GitHub**.
 
 1. In **Workflows**, export important saved workflows to a JSON backup before updating. Review any in-flight queue items.
-2. Download **`queued-for-chatgpt-v1.2.18.zip`** from the [v1.2.18 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.18) and extract it.
+2. Download **`queued-for-chatgpt-v1.2.19.zip`** from the [v1.2.19 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.19) and extract it.
 3. **Keep your existing installed extension folder and extension ID.** Copy the updated extension files and `icons` folder from the newly extracted copy into that **same original folder**, replacing the matching files. Do **not** uninstall the extension or load a second copy from a different folder.
 4. Open **`chrome://extensions`**, click **Reload** on the existing Queued for ChatGPT card, and confirm its version.
 5. Refresh all ChatGPT tabs. Queued will remain asleep until you use its toolbar icon or Alt+Shift+Q in each tab.
@@ -182,9 +184,9 @@ After automatic sleep, Queued can be reopened with **Alt+Shift+Q** or the toolba
 
 ## JSON workflow and settings backups
 
-Choose **Workflows → Export workflows + settings** to download a version 4 JSON backup. It contains all Saved Queue Workflows and the automatic turn-off duration. Desktop notification preferences are no longer exported. It does **not** include per-chat pending queues, previous prompt activity, active execution state, or Chrome-managed keyboard shortcut assignments. Backup files may contain full workflow prompts; store them securely.
+Choose **Workflows → Export workflows + settings** to download a version 5 JSON backup. It contains all Saved Queue Workflows and the automatic turn-off duration. Desktop notification preferences are no longer exported. It does **not** include per-chat pending queues, previous prompt activity, active execution state, or Chrome-managed keyboard shortcut assignments. Backup files may contain full workflow prompts; store them securely.
 
-Use **Import workflows + settings** to merge workflows by name. If the backup includes settings, a confirmation asks before replacing your existing idle timeout. Canceling the confirmation leaves the import unchanged. Legacy **version 3 workflow-only** and **version 4 settings** JSON files still import normally and never overwrites your current settings. Invalid settings are rejected before the workflow import. If saving settings fails after workflows were imported, the extension reports that partial outcome.
+Use **Import workflows + settings** to merge workflows by name. If the backup includes settings, a confirmation asks before replacing your existing idle timeout. Canceling the confirmation leaves the import unchanged. Legacy **version 3 workflow-only** backups import without changing existing settings. **Version 4 settings** backups require confirmation and restore only the idle timeout; removed notification preferences are ignored. Invalid settings are rejected before the workflow import. If saving settings fails after workflows were imported, the extension reports that partial outcome.
 
 Export important workflows before an in-place update. To preserve your existing browser queues and settings, keep the **same installed extension folder and extension ID**.
 

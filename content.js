@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.18 — safe composer settling and sequential queue recovery. */
+/* Queued for ChatGPT v1.2.19 — bounded Send readiness retries and safe sequential queue recovery. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;

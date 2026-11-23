@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Queued for ChatGPT",
   "short_name": "Queued for ChatGPT",
-  "version": "1.2.18",
+  "version": "1.2.19",
   "description": "Lightweight on-demand ChatGPT queues with safe sequential response detection, workflows and settings backups.",
   "permissions": [
     "storage",
