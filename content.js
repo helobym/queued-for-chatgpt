@@ -1409,18 +1409,23 @@
     // after a click remains the caller's responsibility.
     const SEND_BUTTON_RETRY_MS = 3000;
     const MAX_SEND_BUTTON_RETRIES = 3;
+    const intendedText = C.normalize(text);
+    // The framework may expose the newly inserted value one render later.
+    // Only treat a later text change as an edited draft once our text was seen.
+    let sawInsertedText = C.normalize(editorText(editor)) === intendedText;
     for (let retry = 0; retry <= MAX_SEND_BUTTON_RETRIES && healthyRoute(route); retry++) {
       if (retry) setStatus(`Waiting for Send button — retry ${retry}/${MAX_SEND_BUTTON_RETRIES}…`);
       const deadline = Date.now() + SEND_BUTTON_RETRY_MS;
       while (Date.now() < deadline && healthyRoute(route)) {
         // An edited/replaced composer or new generation may mean the message
         // was submitted elsewhere. Never overwrite or click in that state.
-        if (findEditor() !== editor || C.normalize(editorText(editor)) !== C.normalize(text) ||
-            isGenerating(editor)) {
+        const sameText = C.normalize(editorText(editor)) === intendedText;
+        if (sameText) sawInsertedText = true;
+        if (findEditor() !== editor || (sawInsertedText && !sameText) || isGenerating(editor)) {
           pause('Composer changed before sending. Check ChatGPT before retrying.', 'interrupted', 'send');
           return false;
         }
-        const button = findSendButton(editor);
+        const button = sameText ? findSendButton(editor) : null;
         if (button && !button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
             !button.closest('[inert]')) {
           // Record the intentional send before clicking: the site may update its URL immediately.
