@@ -1403,24 +1403,41 @@
   async function sendMessage(text, route, editor) {
     // No asynchronous gap between the caller's final preflight and insertion.
     if (!writeEditor(editor, text)) { pause('Composer changed; cannot safely insert prompt.', 'interrupted', 'composer'); return false; }
-    const deadline = Date.now() + 3000;
-    while (Date.now() < deadline && healthyRoute(route)) {
-      const button = findEditor() === editor ? findSendButton(editor) : null;
-      if (button && !button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
-          !button.closest('[inert]') && C.normalize(editorText(editor)) === C.normalize(text) &&
-          !isGenerating(editor)) {
-        // Record the intentional send before clicking: the site may update its URL immediately.
-        if (newChatHandoff?.from === route) newChatHandoff.clickedAt = Date.now();
-        // This is an attempt, not proof of acceptance. Receipt verification
-        // in the caller must succeed before changing to "awaiting".
-        trackingSendAttempt = true;
-        observedStopDuringSend = false;
-        button.click();
-        return true;
+    // ChatGPT may enable Send asynchronously after accepting the inserted text.
+    // Check for up to 3 seconds initially, then make three more bounded 3-second
+    // checks. Never insert the text again or click twice: receipt verification
+    // after a click remains the caller's responsibility.
+    const SEND_BUTTON_RETRY_MS = 3000;
+    const MAX_SEND_BUTTON_RETRIES = 3;
+    for (let retry = 0; retry <= MAX_SEND_BUTTON_RETRIES && healthyRoute(route); retry++) {
+      if (retry) setStatus(`Waiting for Send button — retry ${retry}/${MAX_SEND_BUTTON_RETRIES}…`);
+      const deadline = Date.now() + SEND_BUTTON_RETRY_MS;
+      while (Date.now() < deadline && healthyRoute(route)) {
+        // An edited/replaced composer or new generation may mean the message
+        // was submitted elsewhere. Never overwrite or click in that state.
+        if (findEditor() !== editor || C.normalize(editorText(editor)) !== C.normalize(text) ||
+            isGenerating(editor)) {
+          pause('Composer changed before sending. Check ChatGPT before retrying.', 'interrupted', 'send');
+          return false;
+        }
+        const button = findSendButton(editor);
+        if (button && !button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
+            !button.closest('[inert]')) {
+          // Record the intentional send before clicking: the site may update its URL immediately.
+          if (newChatHandoff?.from === route) newChatHandoff.clickedAt = Date.now();
+          // This is an attempt, not proof of acceptance. Receipt verification
+          // in the caller must succeed before changing to "awaiting".
+          trackingSendAttempt = true;
+          observedStopDuringSend = false;
+          button.click();
+          return true;
+        }
+        await signalOrTimeout(Math.min(250, Math.max(0, deadline - Date.now())));
       }
-      await signalOrTimeout(250);
     }
-    pause('Could not verify the Send button. Check draft before retrying.', 'interrupted', 'send');
+    if (healthyRoute(route)) {
+      pause('Could not verify Send button after 3 retries. Check draft before retrying.', 'interrupted', 'send');
+    }
     return false;
   }
   // DOM nodes can be replaced when ChatGPT re-renders a conversation. A new
