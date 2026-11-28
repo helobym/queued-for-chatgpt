@@ -1,8 +1,10 @@
-# Queued for ChatGPT v1.2.20 — Lightweight Sequential Queue
+# Queued for ChatGPT v1.2.21 — Lightweight Sequential Queue
 
 An unofficial, independently written, lightweight Chrome / Chromebook extension for sequential ChatGPT prompts and reusable **Saved Queue Workflows**. No Superpower dependency, login, subscription, or cloud server.
 
 **⬇ Get v1.2.20:** Download the extension ZIP and SHA-256 checksum from the [v1.2.20 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.20), or if GitHub blocks release creation, from [GitHub Actions — v1.2.20 builds](https://github.com/helobym/queued-for-chatgpt/actions/workflows/publish-v1.2.20.yml) → latest successful run → **Artifacts** → `queued-for-chatgpt-v1.2.20`. Source is also available through **Code → Download ZIP**.
+
+**New in v1.2.21 (development):** Enable Response completion alarm in Settings for a one-second local beep after verified queued or manual responses while the extension is active. Off by default; no new permissions. Browser audio and manual composer compatibility are best effort. The download links below refer to the last published v1.2.20 release until v1.2.21 is released.
 
 **New in v1.2.20:** If ChatGPT's response completion cannot be confirmed at the normal deadline, Queued makes three additional 3-second verification checks before pausing. These checks only observe the response; they never resend a prompt or accept an idle composer as proof. New Chat/Project and existing-chat queues share the behavior. Manual Pause and route changes stop the checks. No new Chrome permissions, storage migrations, or background polling.
 
