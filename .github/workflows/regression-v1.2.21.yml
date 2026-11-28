@@ -2,11 +2,20 @@ name: v1.2.21 Regression
 
 on:
   push:
-    branches: [main, feature/lightweight-completion-alarm]
+    branches: [main]
     paths:
       - '.github/workflows/regression-v1.2.21.yml'
       - 'content.js'
+      - 'content.css'
+      - 'background.js'
+      - 'core.js'
+      - 'coordinator.js'
+      - 'manifest.json'
       - 'tests/**'
+      - 'README.md'
+      - 'PRIVACY.md'
+      - 'CHANGELOG.md'
+      - 'UPGRADE-CHECKLIST.txt'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -19,10 +28,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - name: Checkout candidate source
+      - name: Checkout exact tested revision
         uses: actions/checkout@v4
         with:
-          ref: feature/lightweight-completion-alarm
           persist-credentials: false
 
       - name: Set up Python for simulated browser tests
@@ -113,4 +121,50 @@ jobs:
           python3 tests/smoke_workflows.py
           python3 tests/smoke_draggable_panel.py
           python3 tests/smoke_browser.py
+          python3 tests/smoke_completion_alarm.py
+
+      - name: Create unpacked-extension ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import zipfile
+
+          root = pathlib.Path('.')
+          manifest = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
+          assert manifest['version'] == '1.2.21', 'This workflow only publishes v1.2.21'
+          required = [
+              'manifest.json', 'background.js', 'content.js', 'content.css',
+              'core.js', 'coordinator.js', 'LICENSE', 'NOTICE.txt',
+              'PRIVACY.md', 'README.md', 'UPGRADE-CHECKLIST.txt'
+          ]
+          required += [str(f) for f in sorted((root / 'icons').glob('*.png'))]
+          assert len(required) >= 14, 'Extension icons are missing'
+          archive = pathlib.Path('queued-for-chatgpt-v1.2.21.zip')
+          with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as zipped:
+              for name in required:
+                  file = root / name
+                  assert file.is_file(), f'Missing {name}'
+                  zipped.write(file, arcname=name)
+          with zipfile.ZipFile(archive) as zipped:
+              assert zipped.testzip() is None, 'Corrupt ZIP'
+              assert 'manifest.json' in zipped.namelist(), 'Manifest must be at ZIP root'
+          checksum = hashlib.sha256(archive.read_bytes()).hexdigest()
+          pathlib.Path('queued-for-chatgpt-v1.2.21.zip.sha256').write_text(
+              f'{checksum}  {archive.name}\n', encoding='utf-8')
+          print(f'Packaged {archive} ({archive.stat().st_size} bytes); SHA256 {checksum}')
+          PY
+
+      - name: Upload regression-tested v1.2.21 candidate build
+        uses: actions/upload-artifact@v4
+        with:
+          name: queued-for-chatgpt-v1.2.21
+          path: |
+            queued-for-chatgpt-v1.2.21.zip
+            queued-for-chatgpt-v1.2.21.zip.sha256
+          if-no-files-found: error
+          retention-days: 90
 
