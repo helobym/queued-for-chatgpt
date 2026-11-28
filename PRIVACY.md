@@ -1,13 +1,13 @@
 # Privacy Policy — Queued for ChatGPT
 
-**Last updated:** 19 November 2026  
+**Last updated:** 28 November 2026  
 **Publisher:** Helobym Networking (Malaysia)
 
 Queued for ChatGPT is a browser extension that helps users save prompt workflows and send queued prompts through ChatGPT. It is an independent project and is not affiliated with OpenAI.
 
 ## What the extension stores
 
-The extension stores queued prompts, saved workflows, queue status, conversation identifiers, and interface preferences in Chrome's local extension storage. It also retains one short preview (up to 160 characters) of the most recently verified completed prompt per conversation, its completion time, and workflow origin when available. It may retain temporary conversation identifiers and panel positioning in tab-local storage. The idle turn-off duration is shared between active tabs. Earlier versions stored desktop-notification preferences and short-lived notification run metadata; v1.2.18 no longer reads, updates, or uses these historical records. Older Favorites records may remain stored for backup. The extension does not create a separate assistant-response archive.
+The extension stores queued prompts, saved workflows, queue status, conversation identifiers, and interface preferences in Chrome's local extension storage. It also retains one short preview (up to 160 characters) of the most recently verified completed prompt per conversation, its completion time, and workflow origin when available. It may retain temporary conversation identifiers and panel positioning in tab-local storage. The idle turn-off duration and optional completion alarm setting are shared between active tabs. Earlier versions stored desktop-notification preferences and short-lived notification run metadata; v1.2.18 no longer reads, updates, or uses these historical records. Older Favorites records may remain stored for backup. The extension does not create a separate assistant-response archive.
 
 This information stays in your browser profile. **Helobym Networking does not operate a server that receives it.** The extension does not use advertising trackers, analytics, or telemetry.
 
@@ -17,7 +17,7 @@ When you click **Start** or **Start Workflow**, the extension submits your selec
 
 Clicking **Copy** on a queued prompt or an individual saved workflow step places that prompt's full text on your device's clipboard. Copy does not send the prompt to ChatGPT or to Helobym Networking. Clipboard contents may be accessible to other applications on your device.
 
-Version 1.2.18 no longer shows desktop notifications or plays custom notification sounds. Workflow status and safety warnings remain visible in the extension panel.
+Desktop notifications and offscreen audio were removed in v1.2.18. Version 1.2.21 adds an optional, off-by-default local completion beep. Manual submission verification temporarily reads the current prompt and response from the open ChatGPT page in memory and releases its observation state when completed, cancelled or timed out. It does not save those manual prompts or replies to storage or send them to any additional service. The alarm setting is stored locally; it is not exported in workflow backups. Workflow status and safety warnings remain visible in the extension panel.
 
 Prompt content submitted to ChatGPT is processed by OpenAI under its own terms and privacy policy. Helobym Networking does not control how OpenAI processes that content.
 
