@@ -1,13 +1,13 @@
-QUEUED FOR CHATGPT — Upgrade to v1.2.20
+QUEUED FOR CHATGPT — Upgrade to v1.2.21
 
 [ ] Finish active workflows or pause and review uncertain prompts.
 [ ] Export important Saved Workflows and keep the JSON backup somewhere safe.
 [ ] Keep the SAME installed extension folder and extension ID. Do not uninstall first.
-[ ] Download queued-for-chatgpt-v1.2.20.zip from GitHub Release v1.2.20 if available, or from Actions > Publish v1.2.20 > latest run > Artifacts (extract the outer artifact ZIP first).
+[ ] Download queued-for-chatgpt-v1.2.21.zip from GitHub Release v1.2.21 if available, or from Actions > v1.2.21 Regression > latest successful run > Artifacts (extract the outer artifact ZIP first).
 [ ] Replace the old extension files in that SAME folder. Older offscreen.html / offscreen.js files can be removed; they are no longer used.
-[ ] Open chrome://extensions, Reload the existing extension, and verify v1.2.20.
+[ ] Open chrome://extensions, Reload the existing extension, and verify v1.2.21.
 [ ] Refresh ChatGPT tabs and open the panel using toolbar or Alt+Shift+Q.
-[ ] Confirm Settings shows keyboard shortcut and idle turn-off only (no desktop notification settings).
+[ ] Confirm Settings shows keyboard shortcut, idle turn-off and Response completion alarm (off by default; no desktop notification settings).
 [ ] Verify idle turn-off options, Never, and safe no-sleep behavior during active/uncertain prompts.
 [ ] Verify all saved workflows and pending queues remain intact.
 [ ] Export JSON and verify backup version 5 includes workflows and settings.autoTurnOffMinutes, without notificationSettings.
@@ -18,6 +18,7 @@ QUEUED FOR CHATGPT — Upgrade to v1.2.20
 [ ] If Send is initially unavailable, verify up to three additional 3-second readiness retries before pausing; confirm a successful send is clicked only once and an unsent draft is never overwritten.
 [ ] If a reply cannot be confirmed at its normal deadline, verify three additional 3-second response checks; confirm they never resend the prompt, never bypass completion proof, and manual Pause prevents the next prompt.
 [ ] Verify persistent drafts are protected and manual Stop does not trigger another prompt.
+[ ] Enable the alarm; verify one beep for a completed manual response and each completed queued response. Stop or Pause before completion and confirm silence. Disable and verify silence. Close Queued and verify it does not monitor manual replies.
 [ ] Compare CPU/RAM with earlier builds if desired; real-world savings are not guaranteed.
 
 IMPORTANT:
@@ -25,4 +26,4 @@ IMPORTANT:
 - Preserve the original installed folder/extension ID to retain access to local data.
 - JSON backups contain FULL saved workflow prompts. Store them privately.
 - Version 4 backup notification preferences are no longer applied.
-- Desktop notifications, offscreen audio, and both Chrome permissions have been removed.
+- Desktop notifications and offscreen audio remain removed. The completion alarm preference is local and is not exported.
