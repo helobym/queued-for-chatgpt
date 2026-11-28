@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.21 (2026-11-28)
+
+- Add an opt-in one-second response completion alarm for queued and manually submitted prompts while Queued is active.
+- Reuse verified queue completion; manual prompts use a bounded composer observer. No new permissions, background workers or recurring polling.
+- Browser audio delivery and memory overhead require live verification. Alarm preference is local and excluded from workflow backups.
+
 ## 1.2.20 (2026-11-23)
 
 - After the normal response-completion deadline, retry the existing completion-evidence checks in three additional 3-second windows before safely pausing.
