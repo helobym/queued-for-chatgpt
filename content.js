@@ -1,4 +1,4 @@
-/* Queued for ChatGPT v1.2.20 — bounded Send and response completion retries. */
+/* Queued for ChatGPT v1.2.21 — opt-in completion alarm. */
 (() => {
   'use strict';
   if (globalThis.__qfcContentLoaded || !globalThis.QFC || !chrome?.storage?.local) return;
@@ -64,6 +64,88 @@
   // Settings is a view within the floating window, not a new browser tab.
   // Saved workflow expansion and selected Queue/Workflows tab remain untouched.
   let settingsOpen = false;
+  const ALARM_KEY = 'qfc_v1_completion_alarm';
+  let alarmEnabled = false, manualAlarm = null, alarmAudio = null;
+  function closeAlarmAudio() {
+    const audio = alarmAudio;
+    alarmAudio = null;
+    if (audio) void audio.close().catch(() => {});
+  }
+  function playCompletionAlarm() {
+    if (!alarmEnabled || disposed || disposing || alarmAudio) return;
+    try {
+      const Audio = window.AudioContext || window.webkitAudioContext;
+      if (!Audio) return;
+      const audio = alarmAudio = new Audio();
+      const oscillator = audio.createOscillator(), gain = audio.createGain();
+      oscillator.frequency.value = 740;
+      gain.gain.setValueAtTime(0.08, audio.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 1);
+      oscillator.connect(gain); gain.connect(audio.destination);
+      oscillator.onended = () => { if (alarmAudio === audio) closeAlarmAudio(); };
+      oscillator.start(); oscillator.stop(audio.currentTime + 1);
+      const timer = setTimeout(() => {
+        transientTimers.delete(timer);
+        if (alarmAudio === audio) closeAlarmAudio();
+      }, 2000);
+      transientTimers.add(timer);
+      void audio.resume().catch(() => { if (alarmAudio === audio) closeAlarmAudio(); });
+    } catch (_) { closeAlarmAudio(); }
+  }
+  function clearManualAlarm() {
+    if (!manualAlarm) return;
+    manualAlarm.observer.disconnect();
+    clearTimeout(manualAlarm.timeout);
+    clearTimeout(manualAlarm.settle);
+    manualAlarm = null;
+    scheduleIdleSleep();
+  }
+  function armManualAlarm() {
+    if (!alarmEnabled || state.running || runnerPromise || disposed || disposing) return;
+    const editor = findEditor(), area = composerArea(editor);
+    if (!area || !C.normalize(editorText(editor)) || isGenerating(editor)) return;
+    clearManualAlarm();
+    const baseline = assistantMessages().at(-1);
+    const path = location.pathname;
+    const attempt = { observer: null, timeout: null, settle: null, sawStop: false };
+    manualAlarm = attempt;
+    const valid = () => alarmEnabled && !state.running && !disposed && !disposing &&
+      area.isConnected && (location.pathname === path || !C.conversationId(path));
+    const check = () => {
+      if (manualAlarm !== attempt) return;
+      if (!valid()) { clearManualAlarm(); return; }
+      if (isGenerating()) {
+        attempt.sawStop = true;
+        clearTimeout(attempt.settle); attempt.settle = null;
+      } else if (attempt.sawStop && !attempt.settle) {
+        attempt.settle = setTimeout(() => {
+          attempt.settle = null;
+          if (manualAlarm !== attempt) return;
+          if (!valid()) { clearManualAlarm(); return; }
+          if (isGenerating()) return;
+          const newest = assistantMessages().at(-1);
+          const complete = newest && newest !== baseline && assistantText(newest) &&
+            assistantHasCompletedActions(newest);
+          clearManualAlarm();
+          if (complete) playCompletionAlarm();
+        }, 1700);
+      }
+    };
+    attempt.observer = new MutationObserver(check);
+    attempt.observer.observe(area, { childList: true, subtree: true, attributes: true,
+      attributeFilter: ['aria-label', 'data-testid', 'd'] });
+    attempt.timeout = setTimeout(clearManualAlarm, 10 * 60 * 1000);
+    scheduleIdleSleep();
+  }
+  function renderAlarmSetting() {
+    const input = root?.querySelector('#qfc-completion-alarm');
+    if (input) input.checked = alarmEnabled;
+  }
+  function applyAlarmSetting(value) {
+    alarmEnabled = value === true;
+    if (!alarmEnabled) { clearManualAlarm(); closeAlarmAudio(); }
+    renderAlarmSetting();
+  }
   const IDLE_SLEEP_SCALE_MS = 60 * 1000;
   let autoTurnOffMinutes = C.DEFAULT_AUTO_TURN_OFF_MINUTES;
   let confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
@@ -89,7 +171,7 @@
   function canSleep() {
     return initialized && autoTurnOffMinutes > 0 && !disposed && !disposing &&
       !state.running && !runnerPromise && !state.routeLoading && !uiOperations &&
-      !autoOffWriteLoop &&
+      !autoOffWriteLoop && !manualAlarm &&
       !pendingWorkflowLoads.size && !hasUnsavedInput() &&
       !state.queue.some(item => item.status !== 'pending');
   }
@@ -520,6 +602,8 @@
           </select>
           <p class="qfc-settings-help" id="qfc-auto-turn-off-help">The full countdown begins after a run finishes and its sender lock is released. Running or uncertain prompts, unsaved edits and unfinished saves prevent automatic turn-off.</p>
           <p class="qfc-settings-feedback" id="qfc-auto-turn-off-status" role="status" aria-live="polite">Ready</p>
+          <label class="qfc-label"><input type="checkbox" id="qfc-completion-alarm"> Response completion alarm</label>
+          <p class="qfc-settings-help">Play a short sound after verified completion while Queued is active. Browser audio restrictions may prevent playback.</p>
         </div>
         <footer id="qfc-status" role="status">Paused</footer>
       </section>`;
@@ -551,6 +635,14 @@
     root.querySelector('#qfc-import-file').addEventListener('change', importFile);
     root.addEventListener('change', event => {
       const target = event.target;
+      if (target.id === 'qfc-completion-alarm') {
+        const previous = alarmEnabled;
+        applyAlarmSetting(target.checked);
+        void STORAGE.set({ [ALARM_KEY]: alarmEnabled }).catch(() => {
+          applyAlarmSetting(previous); notify('Could not save alarm preference.');
+        });
+        return;
+      }
       if (target.id === 'qfc-auto-turn-off') {
         saveAutoTurnOffMinutes(Number(target.value));
         return;
@@ -1610,6 +1702,7 @@
         trackingSendAttempt = false;
         if (!healthyRoute(route)) return;
         await queueOp('complete', { id: item.id }, route); render();
+        playCompletionAlarm();
         setStatus('Response complete; continuing queue…');
       }
       if (state.running) pause('Queue complete.', 'success');
@@ -1665,6 +1758,7 @@
       await queueOp('complete', { id: handoff.id }, stableRoute);
       trackingSendAttempt = false;
       newChatHandoff = null;
+      playCompletionAlarm();
       setStatus('First response complete; continuing queue…');
       await runQueue(stableRoute);
     });
@@ -1759,6 +1853,7 @@
         'Discard the unsaved Queued text or workflow edit and turn off only this tab?')) return false;
     } else if (!canSleep()) return false;
     disposing = true;
+    clearManualAlarm(); closeAlarmAudio();
     idleSince = null;
     clearIdleTimer();
     // Stop the runner immediately, before an asynchronous shutdown handshake.
@@ -1856,7 +1951,15 @@
       if (state.running && event.isTrusted && event.target.closest?.(STOP_SELECTORS)) {
         pause('Response manually stopped. Review the current queued prompt.', 'manual');
       }
+      if (event.isTrusted && alarmEnabled) {
+        const editor = findEditor(), send = findSendButton(editor);
+        if (event.target.closest?.(STOP_SELECTORS) ||
+            (isGenerating(editor) && composerArea(editor)?.contains(event.target) &&
+             event.target.closest?.('button'))) clearManualAlarm();
+        else if (send && send.contains(event.target)) armManualAlarm();
+      }
       const link = event.target.closest?.('a[href]');
+      if (link) clearManualAlarm();
       if (link) {
         try {
           const destination = new URL(link.href);
@@ -1873,13 +1976,17 @@
     document.addEventListener('click', onDocumentClick, true);
     cleanupListeners.push(() => document.removeEventListener('click', onDocumentClick, true));
     const onDocumentKeydown = event => {
+      if (event.isTrusted && alarmEnabled && event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+        const editor = findEditor();
+        if (editor?.contains(event.target)) armManualAlarm();
+      }
       if (currentRoute() || event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
       const editor = findEditor();
       if (editor && (event.target === editor || editor.contains(event.target)) && C.normalize(editorText(editor))) tempSubmittedAt = Date.now();
     };
     document.addEventListener('keydown', onDocumentKeydown, true);
     cleanupListeners.push(() => document.removeEventListener('keydown', onDocumentKeydown, true));
-    const onPageHide = () => pause('Tab closed or navigating away.', 'abandoned');
+    const onPageHide = () => { clearManualAlarm(); closeAlarmAudio(); pause('Tab closed or navigating away.', 'abandoned'); };
     window.addEventListener('pagehide', onPageHide);
     cleanupListeners.push(() => window.removeEventListener('pagehide', onPageHide));
   }
@@ -1887,13 +1994,14 @@
     initPanel();
     try {
       const [record, settings] = await Promise.all([
-        rpc('getWorkflows'), STORAGE.get(C.SETTINGS_KEY)
+        rpc('getWorkflows'), STORAGE.get([C.SETTINGS_KEY, ALARM_KEY])
       ]);
       applyWorkflows(record);
       // Opening is local to an activation, not the obsolete cross-tab open flag.
       state.open = false;
       autoTurnOffMinutes = C.cleanAutoTurnOffMinutes(settings[C.SETTINGS_KEY]?.autoTurnOffMinutes);
       confirmedAutoTurnOffMinutes = autoTurnOffMinutes;
+      applyAlarmSetting(settings[ALARM_KEY]);
       renderAutoTurnOffSetting();
     } catch (_) { state.storageHealthy = false; setStatus('Could not load workflows. Reload the tab.'); }
     checkRoute();
@@ -1910,6 +2018,7 @@
         renderAutoTurnOffSetting();
         scheduleIdleSleep({ reset: true });
       }
+      if (changes[ALARM_KEY]) applyAlarmSetting(changes[ALARM_KEY].newValue);
       if (changes[C.WORKFLOWS_KEY]) applyWorkflows(changes[C.WORKFLOWS_KEY].newValue);
       if (state.route && changes[C.queueKey(state.route)]) applyQueue(state.route, changes[C.queueKey(state.route)].newValue);
     };
@@ -1924,6 +2033,7 @@
   // that is awaiting this initialization. No runner can start before readiness.
   function failedInitialization(error) {
     disposed = true;
+    clearManualAlarm(); closeAlarmAudio();
     initialized = false;
     routeLoadGeneration++; // Ignore any in-flight startup route read.
     clearIdleTimer();
