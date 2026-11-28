@@ -4,7 +4,7 @@ An unofficial, independently written, lightweight Chrome / Chromebook extension 
 
 **⬇ Get v1.2.20:** Download the extension ZIP and SHA-256 checksum from the [v1.2.20 GitHub Release](https://github.com/helobym/queued-for-chatgpt/releases/tag/v1.2.20), or if GitHub blocks release creation, from [GitHub Actions — v1.2.20 builds](https://github.com/helobym/queued-for-chatgpt/actions/workflows/publish-v1.2.20.yml) → latest successful run → **Artifacts** → `queued-for-chatgpt-v1.2.20`. Source is also available through **Code → Download ZIP**.
 
-**New in v1.2.21 (development):** Enable Response completion alarm in Settings for a one-second local beep after verified queued or manual responses while the extension is active. Off by default; no new permissions. Browser audio and manual composer compatibility are best effort. The download links below refer to the last published v1.2.20 release until v1.2.21 is released.
+**New in v1.2.21 (candidate):** Enable Response completion alarm in Settings for a one-second local beep after verified queued or manual responses while the extension is active. Off by default; no new permissions. Browser audio and manual composer compatibility are best effort. The [v1.2.21 regression workflow](https://github.com/helobym/queued-for-chatgpt/actions/workflows/regression-v1.2.21.yml) creates a candidate ZIP and SHA-256 artifact only after all automated checks pass. The stable download links below remain v1.2.20 until the new release is published.
 
 **New in v1.2.20:** If ChatGPT's response completion cannot be confirmed at the normal deadline, Queued makes three additional 3-second verification checks before pausing. These checks only observe the response; they never resend a prompt or accept an idle composer as proof. New Chat/Project and existing-chat queues share the behavior. Manual Pause and route changes stop the checks. No new Chrome permissions, storage migrations, or background polling.
 
@@ -73,7 +73,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 
 ![Queued for ChatGPT v1.2.7 — Workflows page remains open while running, with expanded activity](screenshots/workflows-v1.2.7.svg)
 
-## What changed in v1.2.10
+## What changed in v1.2.10 (historical; notification features removed in v1.2.18)
 
 - **Obvious notification switches:** Larger ON/OFF controls for Desktop notifications, Workflow completed and Stopped automatically, with short explanations and immediate Save status or failure recovery.
 - **Flexible custom audio:** Choose Play Once or any whole number of seconds from 1 to 60, and set volume from 0% (mute) to 100%. Existing saved duration values remain compatible.
@@ -81,7 +81,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 - **Explicit test actions:** Test sound plays a short two-second sample. Test notification requests one silent desktop notification without starting a workflow; OS restrictions still apply.
 - **No workflow changes:** Sender locks, prompt safety, completion verification, run-ID deduplication, manual Pause behavior and stored workflows stay unchanged.
 
-## What changed in v1.2.9
+## What changed in v1.2.9 (historical; notification features removed in v1.2.18)
 
 - **Compact workflow disclosure:** Each saved workflow name now starts with a small, keyboard-accessible chevron. The full Expand/Collapse action button is removed from its control row; Start Workflow, + Load, Edit, Delete, full prompt details and Copy are unchanged.
 - **In-panel Notification Settings:** Click **⚙** beside the reset-position and close controls. Configure desktop notifications, completion/automatic-stop alerts, sounds, duration and visibility. **← Back** returns to the previously selected Queue/Workflows page without resetting expanded workflows.
@@ -90,7 +90,7 @@ Both screenshots below are **illustrative v1.2.7 interface mockups** showing the
 - **Visibility choices:** System Default or **Until dismissed (where supported)** via Chrome's `requireInteraction` option. Arbitrary 5/10-second Chrome popup lifetimes are not available.
 - **No queue changes:** Settings use a separate `chrome.storage.local` key and synchronize across extension tabs. Sender locks, safe receipt/response checks, queued prompt data and automatic/manual stop semantics remain unchanged.
 
-## What changed in v1.2.8
+## What changed in v1.2.8 (historical; notification features removed in v1.2.18)
 
 - **Verified completion alert:** after every automatically verified queued prompt is complete, one desktop notification reports the number of verified prompts and the workflow name when every prompt belongs to the same workflow. Mixed queues are correctly labeled Queue completed.
 - **Automatic-stop alert:** if the runner pauses because of a composer problem, unconfirmed Send, incomplete response, storage change or unexpected page change, one attention notification explains the problem. An uncertain prompt is not retried automatically.
@@ -231,23 +231,11 @@ On **Workflows**, each saved workflow starts collapsed. Click **Expand** to see 
 
 On **Queue**, **Copy** remains available for pending, sending or awaiting-response prompts. All Copy actions preserve full text and line breaks, show brief success/failure feedback, and never send, edit, pause, or remove prompts. Clipboard contents may be accessible to other applications on the device.
 
-## Settings and notification sounds
+## Response completion alarm
 
-Open the floating **☷ Queue** panel and click **⚙ Settings**. Below the automatic turn-off selector, the desktop notification controls remain unchanged. The Desktop notifications, Workflow completed and Stopped automatically switches show ON/OFF states and a small Saved/Save failed indicator. Choose System Default or Silent, or select a locally generated Soft Chime, Double Chime or Alert Beep. For a custom sound, choose **Play once** or **Custom duration** (a whole number from **1–60 seconds**) and adjust **Custom sound volume** from **0–100%**. **Test sound (2s)** requests a brief audio preview and **Test notification** requests a separate silent desktop notification. The test actions do not send prompts or create workflow completion records.
+Open **⚙ Settings** and enable **Response completion alarm** (off by default). A short local beep plays after each verified queued response or verified manually submitted response while Queued is active. Manual Pause, manual Stop, an unconfirmed submission and closing the extension should remain silent. Normal manual responses require a matching new user message and a stable new assistant reply with completion controls. A possible unsent manual attempt expires after 15 seconds; a confirmed response is monitored for at most ten minutes.
 
-**Until dismissed** requests a persistent Chrome notification where supported; Chrome/OS may still dismiss it. **Sound duration is not popup duration**, and OS sound/Focus/Do Not Disturb or browser restrictions can suppress audio or notifications entirely. Custom audio uses the `offscreen` permission, opens an audio-only extension context only as needed, and runs a bounded timer there. No ringtone files are downloaded; no text from prompts or AI responses is included in sound instructions.
-
-The same preferences apply across ChatGPT tabs. They do not interrupt the active queue and do not change how many prompts have been verified. Only automatic completion or automatic-interruption events trigger alerts; manual Pause and manual Stop stay silent.
-
-## Desktop notifications
-
-After you click **Start** or **Start Workflow**, the extension monitors the run using its existing conservative send/response verification. When the final response has been verified, Chrome displays **Workflow completed successfully** with the verified prompt count and workflow name, or **Queue completed successfully** when prompts come from different sources.
-
-If the queue stops itself due to an uncertain send, response, composer or storage condition, Chrome instead displays **Workflow stopped — action required** or **Queue stopped — action required**. It never labels uncertain work as successful. Clicking **Pause** or manually stopping ChatGPT's response does not display an alert.
-
-Chrome may suppress notifications because of operating-system settings, Focus/Do Not Disturb, or blocked notification permissions. Chrome Memory Saver can discard the running ChatGPT tab; the extension attempts an interruption notification from the service worker but cannot guarantee delivery after browser closure, crash or extension reload. A tab being discarded is **not** successful workflow completion. Clicking an alert returns to its original ChatGPT tab if it still exists; a closed tab is not reopened.
-
-The extension uses the **notifications** permission alongside its existing **storage** permission. Notification messages contain a bounded workflow name, outcome/reason and verified count (or a discard warning), not complete prompt text or AI responses. Because the workflow name may be visible on your desktop/lock screen, avoid sensitive names if privacy matters.
+The alarm uses a temporary, coalesced page observer only for manual submissions; queued responses reuse existing verification. Audio is generated locally and its context closes on completion or after a bounded cleanup timeout. No desktop notifications, offscreen audio document, additional Chrome permissions, recurring polling or external services. The ON/OFF preference is local, shared across active tabs, and not included in version 5 workflow backups. Browser autoplay policy, background suspension, tab discard and system volume may prevent sound. Real ChatGPT compatibility and actual memory consumption remain to be measured.
 
 ## Existing features retained
 
@@ -259,7 +247,7 @@ The extension uses the **notifications** permission alongside its existing **sto
 
 ## Safety and limitations
 
-- Auto-send only runs while its ChatGPT tab remains available. A discarded tab may trigger a best-effort interruption alert, but closing the browser or suspending the extension can prevent notification delivery.
+- Auto-send only runs while its ChatGPT tab remains available. A discarded or closed tab cannot reliably detect completion or play a sound.
 - The extension does **not** treat a temporarily idle composer as proof of a completed response. Missing confirmation leads to a pause, not an automatic retry or duplicate send.
 - If an item is marked sending/awaiting, inspect ChatGPT before using **✓ Done** or **↺ Retry**. Retrying may duplicate a message already sent.
 - The runner waits briefly for the composer to clear and settle. A persistent unsent draft is never overwritten; preserve or clear it manually, then select Start. If a send may already have been attempted, review it before using Done or Retry.
@@ -268,19 +256,19 @@ The extension uses the **notifications** permission alongside its existing **sto
 
 ## Automated tests
 
-`node --test tests/*.test.js` — automated unit/coordinator/background test suite (includes workflow metadata, recent completion snapshots, and active-queue Load coverage). The GitHub Release workflow runs these tests and targeted simulated Chromium regressions before publishing the installation archive.
+`node --test tests/*.test.js` — automated unit/coordinator/background test suite (includes workflow metadata, recent completion snapshots, and active-queue Load coverage). The v1.2.21 regression workflow runs these tests and simulated Chromium regressions before uploading the candidate archive.
+
+`tests/completion_alarm.test.js` — deterministic mocked lifecycle and audio cleanup checks.
 
 Playwright (installed Chromium, simulated page):
 
+- `tests/smoke_completion_alarm.py` — manual and queued completion, OFF by default, cancellation and audio cleanup (mock audio).
+
 - `tests/smoke_workflows.py` — collapsed/expanded workflows, create/edit and direct start in an existing chat.
 - `tests/smoke_workflow_load_during_run.py` — Load while idle does not send; Load while running appends after existing prompts and the active runner processes the new steps.
-- `tests/smoke_workflow_new_chat.py` — directly start workflow on New Chat and verify the first prompt is counted exactly once in the completion alert.
-- `tests/smoke_notifications.py` — verified completion, automatic send-stop notification, manual Pause silence and notification-click behavior.
-- `tests/smoke_v129_settings.py` — notification switches, bounded sound duration/volume, save failure rollback, cross-tab updates, audio preview and disabled alerts.
-- `tests/smoke_settings_backup.py` — minimize/close icons, auto-off duration, JSON v4 settings backup, legacy v3 import and invalid-settings rejection.
+- `tests/smoke_workflow_new_chat.py` — directly start workflow on New Chat and verify the first prompt is processed exactly once.
+- `tests/smoke_settings_backup.py` — minimize/close icons, auto-off duration, JSON v5 settings backup, legacy v3 import and invalid-settings rejection.
 - `tests/smoke_tab_sleep.py` — on-demand sleep and reactivation, Never/one-minute duration, safe manual stop and persisted settings.
-- `tests/offscreen_audio.test.js` — bounded generated tone scheduling, replacement, rejection of malformed messages and automatic cleanup.
-- `tests/notifications.test.js` — worker deduplication, session recovery, tab discard, missing permissions and malicious/stale event rejection.
 - `tests/smoke_project_workflows.py` — Project Load/Start, first-send migration, cross-Project isolation and reload persistence.
 - `tests/smoke_queue_copy.py` — complete-text Copy for queued prompts and individual saved workflow steps, including clipboard failures.
 - `tests/smoke_workflow_direct_start_safety.py` — existing queue approval, sender-lock refusal and conservative uncertain-item dock status.
