@@ -94,47 +94,84 @@
   }
   function clearManualAlarm() {
     if (!manualAlarm) return;
-    manualAlarm.observer.disconnect();
-    clearTimeout(manualAlarm.timeout);
-    clearTimeout(manualAlarm.settle);
+    const attempt = manualAlarm;
     manualAlarm = null;
+    attempt.observer?.disconnect();
+    clearTimeout(attempt.timeout);
+    clearTimeout(attempt.checkTimer);
+    clearTimeout(attempt.settle);
     scheduleIdleSleep();
   }
   function armManualAlarm() {
     if (!alarmEnabled || state.running || runnerPromise || disposed || disposing) return;
     const editor = findEditor(), area = composerArea(editor);
-    if (!area || !C.normalize(editorText(editor)) || isGenerating(editor)) return;
+    const text = C.normalize(editorText(editor));
+    const send = findSendButton(editor);
+    if (!area || !text || !send || send.disabled || send.getAttribute('aria-disabled') === 'true' || isGenerating(editor)) return;
     clearManualAlarm();
-    const baseline = assistantMessages().at(-1);
-    const path = location.pathname;
-    const attempt = { observer: null, timeout: null, settle: null, sawStop: false };
+    const attempt = {
+      baseline: assistantMessages().at(-1), users: snapshotUserTurns(), text,
+      path: location.pathname, route: currentRoute(), receipt: false,
+      observer: null, timeout: null, checkTimer: null, settle: null,
+      reply: null, lastText: '', changedAt: 0
+    };
     manualAlarm = attempt;
-    const valid = () => alarmEnabled && !state.running && !disposed && !disposing &&
-      area.isConnected && (location.pathname === path || !C.conversationId(path));
     const check = () => {
       if (manualAlarm !== attempt) return;
-      if (!valid()) { clearManualAlarm(); return; }
-      if (isGenerating()) {
-        attempt.sawStop = true;
+      if (!alarmEnabled || state.running || runnerPromise || disposed || disposing) {
+        clearManualAlarm(); return;
+      }
+      const route = currentRoute();
+      if (location.pathname !== attempt.path &&
+          (attempt.route || !route)) { clearManualAlarm(); return; }
+      if (!attempt.receipt && hasNewUserReceipt(attempt.text, attempt.users)) {
+        attempt.receipt = true;
+        if (route) { attempt.route = route; attempt.path = location.pathname; }
+        // Keep no prompt text or user snapshot after receipt.
+        attempt.text = ''; attempt.users = null;
+        clearTimeout(attempt.timeout);
+        attempt.timeout = setTimeout(clearManualAlarm, 10 * 60 * 1000);
+      }
+      if (attempt.receipt && !attempt.route && route) {
+        attempt.route = route; attempt.path = location.pathname;
+      }
+      if (!attempt.receipt) return;
+      if (!findEditor() || isGenerating()) {
         clearTimeout(attempt.settle); attempt.settle = null;
-      } else if (attempt.sawStop && !attempt.settle) {
-        attempt.settle = setTimeout(() => {
-          attempt.settle = null;
-          if (manualAlarm !== attempt) return;
-          if (!valid()) { clearManualAlarm(); return; }
-          if (isGenerating()) return;
-          const newest = assistantMessages().at(-1);
-          const complete = newest && newest !== baseline && assistantText(newest) &&
-            assistantHasCompletedActions(newest);
-          clearManualAlarm();
-          if (complete) playCompletionAlarm();
-        }, 1700);
+        attempt.reply = null; attempt.lastText = '';
+        return;
+      }
+      const newest = assistantMessages().at(-1);
+      if (!newest || newest === attempt.baseline) return;
+      const response = C.normalize(assistantText(newest));
+      if (!response) return;
+      if (newest !== attempt.reply || response !== attempt.lastText) {
+        attempt.reply = newest; attempt.lastText = response; attempt.changedAt = Date.now();
+      }
+      const remaining = 1700 - (Date.now() - attempt.changedAt);
+      if (remaining > 0) {
+        clearTimeout(attempt.settle);
+        attempt.settle = setTimeout(() => { attempt.settle = null; check(); }, remaining);
+        return;
+      }
+      if (assistantHasCompletedActions(newest)) {
+        clearManualAlarm(); playCompletionAlarm();
       }
     };
-    attempt.observer = new MutationObserver(check);
-    attempt.observer.observe(area, { childList: true, subtree: true, attributes: true,
-      attributeFilter: ['aria-label', 'data-testid', 'd'] });
-    attempt.timeout = setTimeout(clearManualAlarm, 10 * 60 * 1000);
+    // Only active for a possible manual submission. Watch replacements and late
+    // response controls as well as composer changes; coalesce mutation bursts.
+    attempt.observer = new MutationObserver(records => {
+      if (manualAlarm !== attempt || attempt.checkTimer !== null) return;
+      if (records.every(record => {
+        const target = record.target.nodeType === 1 ? record.target : record.target.parentElement;
+        return target?.closest?.('#qfc-root');
+      })) return;
+      attempt.checkTimer = setTimeout(() => { attempt.checkTimer = null; check(); }, 150);
+    });
+    attempt.observer.observe(document.body, { childList: true, subtree: true, characterData: true,
+      attributes: true, attributeFilter: ['aria-label', 'data-testid', 'd'] });
+    // A keyboard shortcut or disabled submission must not hold idle shutdown.
+    attempt.timeout = setTimeout(clearManualAlarm, 15000);
     scheduleIdleSleep();
   }
   function renderAlarmSetting() {
@@ -1702,6 +1739,7 @@
         trackingSendAttempt = false;
         if (!healthyRoute(route)) return;
         await queueOp('complete', { id: item.id }, route); render();
+        if (!healthyRoute(route)) return;
         playCompletionAlarm();
         setStatus('Response complete; continuing queue…');
       }
@@ -1758,6 +1796,7 @@
       await queueOp('complete', { id: handoff.id }, stableRoute);
       trackingSendAttempt = false;
       newChatHandoff = null;
+      if (!healthyRoute(stableRoute)) return;
       playCompletionAlarm();
       setStatus('First response complete; continuing queue…');
       await runQueue(stableRoute);
@@ -1791,6 +1830,7 @@
     if (!navigator.locks?.request) { notify('Web Locks unavailable: auto-send disabled to prevent multiple tabs sending.'); return; }
     // Detect edits that happened in another tab after the user approved starting.
     const initialRevision = state.queueRev;
+    clearManualAlarm();
     state.running = true;
     idleSince = null;
     clearIdleTimer();
@@ -1939,10 +1979,11 @@
       }
     });
     pageObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
-    window.addEventListener('popstate', scheduleRouteCheck);
+    const onPopState = () => { clearManualAlarm(); scheduleRouteCheck(); };
+    window.addEventListener('popstate', onPopState);
     window.addEventListener('hashchange', scheduleRouteCheck);
     cleanupListeners.push(() => {
-      window.removeEventListener('popstate', scheduleRouteCheck);
+      window.removeEventListener('popstate', onPopState);
       window.removeEventListener('hashchange', scheduleRouteCheck);
     });
     const onDocumentClick = event => {
@@ -1976,7 +2017,7 @@
     document.addEventListener('click', onDocumentClick, true);
     cleanupListeners.push(() => document.removeEventListener('click', onDocumentClick, true));
     const onDocumentKeydown = event => {
-      if (event.isTrusted && alarmEnabled && event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
+      if (event.isTrusted && alarmEnabled && event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing && !event.repeat) {
         const editor = findEditor();
         if (editor?.contains(event.target)) armManualAlarm();
       }
