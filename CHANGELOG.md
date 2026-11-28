@@ -3,7 +3,9 @@
 ## 1.2.21 (2026-11-28)
 
 - Add an opt-in one-second response completion alarm for queued and manually submitted prompts while Queued is active.
-- Reuse verified queue completion; manual prompts use a bounded composer observer. No new permissions, background workers or recurring polling.
+- Reuse verified queue completion; manual prompts use a temporary coalesced page observer, matching submission receipt and stable reply with completion controls. No new permissions, background workers or recurring polling.
+- Cancel monitoring on stop, route change, disabling, queue start or shutdown; expire unsubmitted manual attempts after 15 seconds.
+- Add eight deterministic alarm tests and a simulated Chromium integration script. The regression workflow packages a candidate only after all automated checks pass.
 - Browser audio delivery and memory overhead require live verification. Alarm preference is local and excluded from workflow backups.
 
 ## 1.2.20 (2026-11-23)
